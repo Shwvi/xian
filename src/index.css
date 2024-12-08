@@ -24,6 +24,7 @@ body {
   color: var(--fg);
   background: var(--bg);
   padding: var(--space);
+  overscroll-behavior: none;
 }
 
 #root {
@@ -35,4 +36,14 @@ body {
   justify-content: center;
 
   overflow: hidden;
+}
+
+/* 隐藏全局滚动条 - Webkit 浏览器 (Chrome, Safari) */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* 隐藏全局滚动条 - Firefox */
+* {
+  scrollbar-width: none;
 }

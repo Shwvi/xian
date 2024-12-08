@@ -4,7 +4,6 @@ import { IBattleAbleCharacter, ISkill } from "./typing";
 export interface IAIBattleContext {
   self: IBattleAbleCharacter;
   opponent: IBattleAbleCharacter;
-  currentTurn: number;
 }
 
 export interface ISkillScore {

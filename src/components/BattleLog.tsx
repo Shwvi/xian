@@ -1,181 +1,170 @@
-import { IAppendBattleLogEvent, LogType } from "@/core/stream";
-import { memo, useRef, useEffect, useMemo, useState } from "react";
-import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
-import LogItem from "./LogItem";
+import { IAppendBattleLogEvent } from "@/core/stream";
+import { memo, useRef, useEffect, useMemo } from "react";
+import cls from "classnames";
 
 interface BattleLogProps {
   logs: IAppendBattleLogEvent[];
 }
 
-interface GroupedLog {
-  id: string;
-  contents: {
-    content: string;
-    typeSpeed?: number;
-  }[];
+type TokenType = "text" | "red" | "green" | "blue" | "yellow" | "bisque"; // 可以继续扩展颜色
+
+interface Token {
+  type: TokenType;
+  content: string | Token[];
 }
 
-interface TypewriterState {
-  groupIndex: number;
-  contentIndex: number;
-  charIndex: number;
+// 解析文本为 tokens
+function parseContent(content: string): Token[] {
+  const tokens: Token[] = [];
+  let currentToken = "";
+  const stack: Token[] = [];
+  let current = tokens;
+
+  for (let i = 0; i < content.length; i++) {
+    const char = content[i];
+
+    if (char === "(") {
+      if (currentToken) {
+        current.push({ type: "text", content: currentToken });
+        currentToken = "";
+      }
+
+      // 查找颜色标识，设置固定搜索范围
+      const searchLimit = Math.min(i + 20, content.length);
+      const colorEnd = content.indexOf(")", i);
+
+      // 如果在搜索范围内没找到结束括号，直接结束解析
+      if (colorEnd === -1 || colorEnd > searchLimit) {
+        break;
+      }
+
+      const colorMatch = content
+        .slice(i + 1, colorEnd)
+        .match(/^(red|green|blue|yellow|bisque)/);
+
+      if (colorMatch) {
+        const newToken: Token = {
+          type: colorMatch[1] as TokenType,
+          content: [],
+        };
+        current.push(newToken);
+        stack.push(newToken);
+        current = newToken.content as Token[];
+        i += colorMatch[0].length;
+      } else {
+        // 如果没有匹配到颜色，直接结束解析
+        break;
+      }
+      continue;
+    }
+
+    if (char === ")" && stack.length > 0) {
+      if (currentToken) {
+        current.push({ type: "text", content: currentToken });
+        currentToken = "";
+      }
+      stack.pop();
+      current =
+        stack.length > 0
+          ? (stack[stack.length - 1].content as Token[])
+          : tokens;
+      continue;
+    }
+
+    currentToken += char;
+  }
+
+  if (currentToken) {
+    current.push({ type: "text", content: currentToken });
+  }
+
+  return tokens;
 }
 
-const isEmptyGroup = (group: GroupedLog) => {
-  if (group.contents.length === 0) return true;
-  if (group.contents.every((s) => s.content === "")) return true;
-  return false;
-};
+// 渲染 Token 组件
+const TokenComponent = memo(({ token }: { token: Token }) => {
+  const style = useMemo(() => {
+    switch (token.type) {
+      case "red":
+        return { color: "#ef4444" };
+      case "green":
+        return { color: "#22c55e" };
+      case "blue":
+        return { color: "#3b82f6" };
+      case "yellow":
+        return { color: "#eab308" };
+      case "bisque":
+        return { color: "bisque" };
+      default:
+        return {};
+    }
+  }, [token.type]);
+
+  if (Array.isArray(token.content)) {
+    return (
+      <span style={style}>
+        {token.content.map((t, i) => (
+          <TokenComponent key={i} token={t} />
+        ))}
+      </span>
+    );
+  }
+
+  return <span style={style}>{token.content}</span>;
+});
+
+const RichRender = memo(
+  ({ content, isLast }: { content: string; isLast: boolean }) => {
+    const tokens = useMemo(() => parseContent(content), [content]);
+
+    return (
+      <div className="mt-4">
+        <div
+          className={cls(
+            "px-3 rounded transition-all duration-500 text-gray-300",
+            isLast ? "opacity-100" : "opacity-0"
+          )}
+        >
+          <span className="px-1"></span>
+          {tokens.map((token, i) => (
+            <TokenComponent key={i} token={token} />
+          ))}
+        </div>
+      </div>
+    );
+  }
+);
 
 const BattleLog = memo(({ logs }: BattleLogProps) => {
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
-  const [typewriterState, setTypewriterState] = useState<TypewriterState>({
-    groupIndex: 0,
-    contentIndex: 0,
-    charIndex: 0,
-  });
-  const [displayTexts, setDisplayTexts] = useState<Map<string, string>>(
-    new Map()
-  );
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
-  const groupedLogs = useMemo(() => {
-    return logs.reduce<GroupedLog[]>((acc, log, index) => {
-      if (log.type === LogType.GAP) {
-        acc.push({
-          id: `group-${index}`,
-          contents: [],
-        });
-        return acc;
-      }
+  useEffect(() => {
+    if (!scrollContainerRef.current) return;
 
-      if (log.newParagraph || acc.length === 0) {
-        acc.push({
-          id: `group-${index}`,
-          contents: [{ content: log.content, typeSpeed: log.typeSpeed }],
-        });
-      } else {
-        acc[acc.length - 1].contents.push({
-          content: log.content,
-          typeSpeed: log.typeSpeed,
-        });
-      }
-
-      return acc;
-    }, []);
+    scrollContainerRef.current.scrollTo({
+      top: scrollContainerRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [logs]);
 
-  useEffect(() => {
-    const currentGroup = groupedLogs[typewriterState.groupIndex];
-    if (!currentGroup) return;
-
-    const currentContent = currentGroup.contents[typewriterState.contentIndex];
-    if (!currentContent) return;
-
-    const typeSpeed = currentContent.typeSpeed || 50;
-    const logId = `${currentGroup.id}-${typewriterState.contentIndex}`;
-
-    const timer = setTimeout(() => {
-      if (typewriterState.charIndex < currentContent.content.length) {
-        setDisplayTexts((prev) => {
-          const newMap = new Map(prev);
-          newMap.set(
-            logId,
-            currentContent.content.slice(0, typewriterState.charIndex + 1)
-          );
-          return newMap;
-        });
-        setTypewriterState((prev) => ({
-          ...prev,
-          charIndex: prev.charIndex + 1,
-        }));
-      } else {
-        // Move to next content or group
-        const nextState = getNextTypewriterState(
-          typewriterState,
-          groupedLogs,
-          currentGroup
-        );
-        setTypewriterState(nextState);
-      }
-    }, typeSpeed);
-
-    return () => clearTimeout(timer);
-  }, [typewriterState, groupedLogs]);
-
-  useEffect(() => {
-    if (!virtuosoRef.current) return;
-    const isTyping =
-      typewriterState.groupIndex < groupedLogs.length &&
-      typewriterState.charIndex > 0;
-    if (isTyping) {
-      virtuosoRef.current.scrollBy({ top: Number.MAX_SAFE_INTEGER });
-    }
-  }, [typewriterState, groupedLogs.length]);
-
   return (
-    <div className="flex-1 border border-white rounded-lg p-4 mb-4 backdrop-blur">
-      <Virtuoso
-        ref={virtuosoRef}
-        style={{ height: "100%" }}
-        totalCount={groupedLogs.length}
-        alignToBottom
-        initialTopMostItemIndex={groupedLogs.length - 1}
-        itemContent={(index) => {
-          const group = groupedLogs[index];
-          if (isEmptyGroup(group)) return <div className="px-1 h-[1px]" />;
+    <div className="flex-1 rounded-lg my-4 overflow-hidden">
+      <div
+        ref={scrollContainerRef}
+        className="h-full overflow-y-auto flex flex-col scroll-smooth"
+      >
+        <div className="flex-1"></div>
+        {logs.map((log, index) => {
+          const isLast = index === logs.length - 1;
+          if (log.newParagraph)
+            return <div key={index} className="px-1 h-[1px]" />;
           return (
-            <div key={group.id} className="mt-4">
-              <div className="text-gray-300 px-3 rounded">
-                <span className="px-1"></span>
-                {group.contents.map((item, i) => {
-                  const logId = `${group.id}-${i}`;
-                  const isBoundary = i === group.contents.length - 1 || i === 0;
-                  const isCurrentTyping =
-                    typewriterState.groupIndex === index &&
-                    typewriterState.contentIndex === i;
-                  return (
-                    <>
-                      <LogItem
-                        key={logId}
-                        content={item.content}
-                        displayText={displayTexts.get(logId) || ""}
-                        isTyping={isCurrentTyping}
-                      />
-                      {!isBoundary && "，"}
-                    </>
-                  );
-                })}
-              </div>
-            </div>
+            <RichRender key={index} content={log.content} isLast={isLast} />
           );
-        }}
-      />
+        })}
+      </div>
     </div>
   );
 });
-
-function getNextTypewriterState(
-  current: TypewriterState,
-  groupedLogs: GroupedLog[],
-  currentGroup: GroupedLog
-): TypewriterState {
-  if (current.contentIndex < currentGroup.contents.length - 1) {
-    return {
-      ...current,
-      contentIndex: current.contentIndex + 1,
-      charIndex: 0,
-    };
-  }
-
-  if (current.groupIndex < groupedLogs.length - 1) {
-    return {
-      groupIndex: current.groupIndex + 1,
-      contentIndex: 0,
-      charIndex: 0,
-    };
-  }
-
-  return current;
-}
 
 export default BattleLog;

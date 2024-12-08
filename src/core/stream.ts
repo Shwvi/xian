@@ -2,6 +2,7 @@ import { Subject, Observable, OperatorFunction, Subscription } from "rxjs";
 import {
   CharacterSId,
   IBattleAbleCharacter,
+  IBattleTimeControl,
   IEndBattleContext,
   ISkill,
   ISkillDamageBattleContext,
@@ -18,11 +19,18 @@ export enum NormalEvent {
 export enum BattleEvent {
   BATTLE_START = "BATTLE_START",
   SKILL_USE = "SKILL_USE",
+  SKILL_USE_DESC_END = "SKILL_USE_DESC_END",
+
   DAMAGE_DEALT = "DAMAGE_DEALT",
+  DAMAGE_DEALT_DESC_END = "DAMAGE_DEALT_DESC_END",
   BATTLE_END = "BATTLE_END",
+  BATTLE_END_DESC_END = "BATTLE_END_DESC_END",
+  NEXT_CHARACTER_TO_ACT = "NEXT_CHARACTER_TO_ACT",
 
   REQUEST_CHARACTER_STATE = "REQUEST_CHARACTER_STATE",
   RESPONSE_CHARACTER_STATE = "RESPONSE_CHARACTER_STATE",
+
+  TIMELINE_UPDATE = "TIMELINE_UPDATE",
 }
 
 export type CoreEvent = NormalEvent | BattleEvent;
@@ -41,7 +49,8 @@ export interface IAppendBattleLogEvent {
   type: LogType;
   content: string;
   newParagraph?: boolean;
-  typeSpeed?: number;
+  buffer?: boolean;
+  joinOperator?: string;
 }
 
 // 定义每个事件对应的payload类型
@@ -51,11 +60,25 @@ export type EventPayloadMap = {
 
   [BattleEvent.BATTLE_START]: IStartBattleContext;
   [BattleEvent.SKILL_USE]: ISkillUseBattleContext;
+  [BattleEvent.SKILL_USE_DESC_END]: never;
+
   [BattleEvent.DAMAGE_DEALT]: ISkillDamageBattleContext;
+  [BattleEvent.DAMAGE_DEALT_DESC_END]: never;
   [BattleEvent.BATTLE_END]: IEndBattleContext;
+  [BattleEvent.BATTLE_END_DESC_END]: never;
+  [BattleEvent.NEXT_CHARACTER_TO_ACT]: IBattleAbleCharacter | null;
 
   [BattleEvent.REQUEST_CHARACTER_STATE]: CharacterSId;
   [BattleEvent.RESPONSE_CHARACTER_STATE]: IBattleAbleCharacter;
+
+  [BattleEvent.TIMELINE_UPDATE]: {
+    characters: Array<{
+      character: IBattleAbleCharacter;
+      currentTime: number;
+      castingTime?: number;
+    }>;
+    timeControl: IBattleTimeControl;
+  };
 };
 
 // 使用映射类型生成最终的IEvent类型
@@ -78,7 +101,6 @@ export class EventStream<T extends IEvent = IEvent> {
    * 发布事件
    */
   publish(data: T): void {
-    console.log("new Event", data);
     this.subject.next(data);
   }
 

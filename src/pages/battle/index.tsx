@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { CharacterSId, IBattleAbleCharacter, ISkill } from "../../core/typing";
 import { BattleSystem } from "@/core/fight";
 import {
+  BattleEvent,
   filterEvent,
   getCoreStream,
   IAppendBattleLogEvent,
@@ -10,15 +11,29 @@ import {
 import { getCharactersCenter } from "@/data/characters";
 import { BattleDescriptionManager } from "@/core/description";
 import BattleLog from "@/components/BattleLog";
+import cls from "classnames";
+import styles from "./index.module.less";
+import BattleTimeline from "@/components/BattleTimeline";
+import BattleMenu from "@/components/BattleMenu";
+import BattleCharacterStatus from "@/components/BattleCharacterStatus";
 
 export default function Battle() {
-  const [battleSystem, setBattleSystem] = useState<BattleSystem | null>(null);
   const [battleLogs, setBattleLogs] = useState<IAppendBattleLogEvent[]>([]);
   const [player, setPlayer] = useState<IBattleAbleCharacter | null>(null);
   const [enemy, setEnemy] = useState<IBattleAbleCharacter | null>(null);
   const [menuType, setMenuType] = useState<"main" | "skills" | "items" | null>(
     "main"
   );
+  const [timelineCharacters, setTimelineCharacters] = useState<
+    Array<{
+      character: IBattleAbleCharacter;
+      currentTime: number;
+      castingTime?: number;
+    }>
+  >([]);
+  const [timeControl, setTimeControl] = useState<{
+    isPaused: boolean;
+  }>({ isPaused: false });
 
   useEffect(() => {
     const [initialPlayer, initialEnemy] = [
@@ -26,7 +41,7 @@ export default function Battle() {
       CharacterSId.TIE_QUAN,
     ].map(getCharactersCenter().packBattleCharacter);
     const battle = new BattleSystem([initialPlayer, initialEnemy]);
-    setBattleSystem(battle);
+
     setPlayer(initialPlayer);
     setEnemy(initialEnemy);
 
@@ -37,10 +52,31 @@ export default function Battle() {
     battle.setEventStream($);
     descriptionManager.setEventStream($);
 
+    let buffers: IAppendBattleLogEvent[] = [];
+    let joinOperator = "";
     $.pipe(filterEvent(NormalEvent.APPEND_BATTLE_LOG)).subscribe(
       ({ payload }) => {
-        if (payload) {
-          setBattleLogs((prev) => [...prev, payload]);
+        if (payload.joinOperator) {
+          return (joinOperator = payload.joinOperator);
+        }
+        if (payload.buffer) {
+          buffers.push(payload);
+        } else {
+          const currentBuffers = [...buffers];
+          const currentOperator = joinOperator;
+          setBattleLogs((prev) => {
+            if (prev.length === 0) return [payload];
+
+            if (payload.newParagraph || currentBuffers.length !== 0) {
+              return [...prev, ...currentBuffers, payload];
+            } else {
+              prev[prev.length - 1].content +=
+                currentOperator + payload.content;
+              return [...prev];
+            }
+          });
+          buffers = [];
+          joinOperator = "";
         }
       }
     );
@@ -49,119 +85,85 @@ export default function Battle() {
     battle.run();
   }, []);
 
-  const handleSkillSelect = async (skill: ISkill) => {
-    if (!battleSystem) return;
+  useEffect(() => {
+    const timelineSubscription = getCoreStream()
+      .pipe(filterEvent(BattleEvent.TIMELINE_UPDATE))
+      .subscribe(({ payload }) => {
+        setTimelineCharacters(payload.characters);
+        setTimeControl(payload.timeControl);
+      });
 
-    getCoreStream().publish({
-      type: NormalEvent.USER_SELECT_SKILL,
-      payload: skill,
-    });
-  };
+    return () => timelineSubscription.unsubscribe();
+  }, []);
 
-  const renderMainMenu = () => (
-    <div className="grid grid-cols-2 gap-4">
-      <div className="p-2 border rounded-lg cursor-pointer hover:bg-gray-700">
-        <div className="text-left">
-          <div className="font-bold">攻击</div>
-          <div className="text-sm text-gray-400">使用基础攻击</div>
-        </div>
-      </div>
-      <div
-        className="p-2 border rounded-lg cursor-pointer hover:bg-gray-700"
-        onClick={() => setMenuType("skills")}
-      >
-        <div className="text-left">
-          <div className="font-bold">技能</div>
-          <div className="text-sm text-gray-400">使用特殊技能</div>
-        </div>
-      </div>
-      <div
-        className="p-2 border rounded-lg cursor-pointer hover:bg-gray-700"
-        onClick={() => setMenuType("items")}
-      >
-        <div className="text-left">
-          <div className="font-bold">道具</div>
-          <div className="text-sm text-gray-400">使用背包物品</div>
-        </div>
-      </div>
-      {/* 可以添加更多选项 */}
-    </div>
-  );
+  const [nextCharacter, setNextCharacter] =
+    useState<IBattleAbleCharacter | null>(null);
 
-  const renderSkillMenu = () => (
-    <div>
-      <div className="mb-2">
-        <button
-          className="text-sm text-gray-400 hover:text-white"
-          onClick={() => setMenuType("main")}
-        >
-          ← 返回
-        </button>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        {player?.skills.map((skill) => (
-          <div
-            key={skill.name}
-            className={`p-2 border rounded-lg ${
-              skill.cost > (player?.c_mp || 0)
-                ? "opacity-50 cursor-not-allowed"
-                : "cursor-pointer hover:bg-gray-700"
-            }`}
-            onClick={() => handleSkillSelect(skill)}
-          >
-            <div className="text-left">
-              <div className="font-bold">{skill.name}</div>
-              <div className="text-sm text-gray-400">{skill.description}</div>
-              <div className="text-sm text-blue-400">消耗: {skill.cost} MP</div>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+  useEffect(() => {
+    const subscriber = getCoreStream()
+      .pipe(filterEvent(BattleEvent.NEXT_CHARACTER_TO_ACT))
+      .subscribe(({ payload }) => {
+        setNextCharacter(payload);
+      });
+    return () => subscriber.unsubscribe();
+  }, []);
 
   return (
-    <div className="flex flex-col h-full w-full overflow-hidden">
-      {/* 敌方状态 */}
-      <div className="mb-4">
-        <div className="border p-3 rounded-lg">
-          <h3 className="text-lg font-bold">{enemy?.name}</h3>
-          <div>
-            生命值: {enemy?.c_hp}/{enemy?.t_hp}
-          </div>
-        </div>
-      </div>
-
+    <div className={cls("flex flex-col h-full w-full")}>
       {/* 战斗记录 */}
       <BattleLog logs={battleLogs} />
 
-      {/* 玩家状态 */}
-      <div className="mb-4">
-        <div className="border p-3 rounded-lg">
-          <h3 className="text-lg font-bold">{player?.name}</h3>
-          <div>
-            生命值: {player?.c_hp}/{player?.t_hp}
-          </div>
-          <div>
-            灵力: {player?.c_mp}/{player?.t_mp}
-          </div>
+      {/* 角色狀態 */}
+      <div className="flex flex-row lg:flex-row gap-4 mb-4">
+        {/* 敌方状态 */}
+        <div className="flex-1">
+          <BattleCharacterStatus
+            character={enemy}
+            isActive={nextCharacter?.sid === enemy?.sid}
+            type="enemy"
+          />
+        </div>
+
+        {/* 玩家状态 */}
+        <div className="flex-1">
+          <BattleCharacterStatus
+            character={player}
+            isActive={nextCharacter?.sid === player?.sid}
+            type="player"
+          />
         </div>
       </div>
 
-      {/* 菜单选择 */}
-      {menuType === "main" && renderMainMenu()}
-      {menuType === "skills" && renderSkillMenu()}
-      {menuType === "items" && (
-        <div className="text-center text-gray-400">
-          <div>道具功能开发中...</div>
-          <button
-            className="mt-2 text-sm hover:text-white"
-            onClick={() => setMenuType("main")}
-          >
-            ← 返回
-          </button>
-        </div>
-      )}
+      <BattleTimeline
+        characters={timelineCharacters}
+        actionThreshold={1000}
+        isPaused={timeControl.isPaused}
+      />
+
+      <div className="flex items-center justify-center my-2">
+        <hr className="flex-1 h-tiny bg-gray-300 my-2" />
+        <img
+          src="/weapon.png"
+          alt="Icon"
+          className={cls(
+            "w-8 h-8 mx-4 invert",
+            nextCharacter?.sid === player?.sid && "animate-spin"
+          )}
+        />
+        <hr className="flex-1 h-tiny bg-gray-300 my-2" />
+      </div>
+
+      {/* 菜单部分保持不变 */}
+      <BattleMenu
+        menuType={menuType}
+        setMenuType={setMenuType}
+        isPlayerTurn={nextCharacter?.sid === player?.sid}
+        player={player}
+      />
+
+      <div className="h-4" />
+
+      <audio src="/audio/bg_山谷.mp3" autoPlay loop />
     </div>
   );
 }

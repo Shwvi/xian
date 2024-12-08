@@ -11,7 +11,7 @@ export class BaseCharactersCenter {
   private initializeCharacters() {
     this.charactersMap.set(CharacterSId.ME, {
       sid: CharacterSId.ME,
-      name: "凡尘修士",
+      name: "陈尘",
       age: 20,
       life_span: 100,
       health_points: 100,
@@ -19,24 +19,19 @@ export class BaseCharactersCenter {
       attack: 15,
       defense: 10,
       agility: 12,
-      skills: [
-        SkillId.QUAN,
-        SkillId.YU_JIAN_SHU,
-        SkillId.WU_LEI_ZHENG_FA,
-        SkillId.TAI_YI_GUI_YUAN,
-      ],
+      skills: [SkillId.QUAN, SkillId.YU_JIAN_SHU, SkillId.WU_LEI_ZHENG_FA],
     });
 
     this.charactersMap.set(CharacterSId.TIE_QUAN, {
       sid: CharacterSId.TIE_QUAN,
-      name: "铁拳门弟子",
+      name: "铁山门弟子",
       age: 25,
       life_span: 90,
-      health_points: 120,
-      manna_points: 60,
-      attack: 20,
-      defense: 15,
-      agility: 10,
+      health_points: 30,
+      manna_points: 20,
+      attack: 10,
+      defense: 5,
+      agility: 5,
       skills: [
         SkillId.QUAN,
         SkillId.HUN_YUAN_TIE_QUAN,

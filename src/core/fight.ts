@@ -1,35 +1,50 @@
-// 真实的修仙，战斗系统
-// 1. 回合制
-// 2. 开始谁先出手由敏捷或者是否偷袭决定
-// 3. 拥有反制回合，比如对手攻击的时候可以出现反制（看是否有相关技能）
-// 4. 反制有可能失败，有数值机制
-
 import {
   BattleEvent,
   EventStream,
   filterEvent,
-  LogType,
   NormalEvent,
   StreamBasedSystem,
 } from "./stream";
-import { IBattleAbleCharacter, CharacterSId, ISkill } from "./typing";
-import { isUserCharacter, isUserSid } from "./utils";
+import {
+  IBattleAbleCharacter,
+  CharacterSId,
+  ISkill,
+  ITimelineCharacter,
+  IBattleTimeControl,
+} from "./typing";
+import { isUserSid } from "./utils";
 import { IAIBattleContext, BattleAI } from "./battle-ai";
+import { requestAnimationTimeOut, sleep } from "@/utils/sleep";
 
 export type CharacterRemainToActMap = Partial<Record<CharacterSId, true>>;
 
 export class BattleSystem extends StreamBasedSystem {
   private characters: IBattleAbleCharacter[];
-  private charactersRemainToAct: CharacterRemainToActMap = {};
-  private currentTurn: number = 0;
+  private timelineCharacters: ITimelineCharacter[] = [];
+  private currentTime: number = 0;
+  private readonly ACTION_THRESHOLD = 1000; // When character reaches this time, they can act
+  private readonly TIME_STEP = 30;
   private battleEnd?: {
     isEnded: boolean;
     winner?: IBattleAbleCharacter;
+  };
+  private timeControl: IBattleTimeControl = {
+    isPaused: false,
   };
 
   constructor(characters: IBattleAbleCharacter[]) {
     super();
     this.characters = characters;
+
+    // Calculate normalized agility values based on max agility
+    const maxAgility = Math.max(...characters.map((char) => char.agility));
+
+    this.timelineCharacters = characters.map((character) => ({
+      character,
+      currentTime: 0,
+      isActing: false,
+      normalizedAgility: character.agility / maxAgility, // 保持正比关系的归一化
+    }));
   }
 
   override setEventStream(eventStream: EventStream): void {
@@ -49,25 +64,100 @@ export class BattleSystem extends StreamBasedSystem {
     this.addSubscription(subscription);
   }
 
-  private onNewTurnStart() {
-    // 重置出招记录
-    this.charactersRemainToAct = this.characters.reduce((pre, next) => {
-      pre[next.sid] = true;
-      return pre;
-    }, {} as CharacterRemainToActMap);
+  private async advanceTimeline() {
+    await requestAnimationTimeOut(this.TIME_STEP).promise;
 
-    this.currentTurn++;
+    if (!this.timeControl.isPaused) {
+      // 更新所有角色的时间
+      this.timelineCharacters.forEach((tc) => {
+        if (tc.selectedSkill && tc.castingTime !== undefined) {
+          // 如果在施法中，减少施法时间
+          tc.castingTime -= this.TIME_STEP;
+          tc.currentTime += this.TIME_STEP; // 继续累积时间以计算施法进度
+        } else if (!tc.selectedSkill && !tc.isActing) {
+          // 正常累积时间
+          tc.currentTime += this.TIME_STEP * tc.normalizedAgility;
+        }
+      });
+
+      this.currentTime += this.TIME_STEP;
+    }
+
+    this.publishTimelineUpdate();
   }
 
-  private onNewTurnEnd() {
+  private publishTimelineUpdate() {
     this.$.publish({
-      type: NormalEvent.APPEND_BATTLE_LOG,
+      type: BattleEvent.TIMELINE_UPDATE,
       payload: {
-        type: LogType.GAP,
-        content: "",
-        newParagraph: true,
+        characters: this.timelineCharacters.map((tc) => ({
+          character: tc.character,
+          currentTime: tc.currentTime,
+          castingTime: tc.castingTime,
+        })),
+        timeControl: this.timeControl,
       },
     });
+  }
+
+  private async handleCharacterAction(tc: ITimelineCharacter) {
+    this.timeControl = {
+      isPaused: true,
+      pauseReason: "selecting",
+      actingCharacter: tc,
+    };
+
+    tc.isActing = true;
+
+    this.$.publish({
+      type: BattleEvent.NEXT_CHARACTER_TO_ACT,
+      payload: tc.character,
+    });
+
+    tc.selectedSkill =
+      tc.character.sid === CharacterSId.ME
+        ? (await this.once(NormalEvent.USER_SELECT_SKILL)).payload
+        : await this.selectEnemySkill(tc.character);
+
+    this.$.publish({
+      type: BattleEvent.NEXT_CHARACTER_TO_ACT,
+      payload: null,
+    });
+
+    // 先设置施法时间
+    tc.castingTime = this.calculateCastingTime(tc.selectedSkill);
+    // 再重置当前时间到阈值，这样可以正确计算施法进度
+    tc.currentTime = this.ACTION_THRESHOLD;
+
+    this.timeControl = {
+      isPaused: false,
+    };
+  }
+
+  private async handleSkillCasting(tc: ITimelineCharacter) {
+    this.timeControl = {
+      isPaused: true,
+      pauseReason: "executing",
+      actingCharacter: tc,
+    };
+
+    await this.executeSkill(tc.character, tc.selectedSkill!);
+
+    await requestAnimationTimeOut(500).promise;
+
+    // 重置所有状态
+    tc.currentTime = 0;
+    tc.isActing = false;
+    tc.selectedSkill = undefined;
+    tc.castingTime = undefined;
+
+    this.timeControl = {
+      isPaused: false,
+    };
+  }
+
+  private calculateCastingTime(skill: ISkill): number {
+    return (skill.cost * 0.3 + (skill.damage || 0) * 0.2) * 100;
   }
 
   private measureEnd() {
@@ -78,31 +168,6 @@ export class BattleSystem extends StreamBasedSystem {
     if (battleEnd.isEnded) this.battleEnd = battleEnd;
 
     return battleEnd;
-  }
-
-  private async nextCharacterToAct() {
-    const sortedCharacters = this.determineInitiative();
-    const nextCharacter = sortedCharacters[0];
-
-    if (isUserCharacter(nextCharacter)) {
-      const { payload: skill } = await this.once(NormalEvent.USER_SELECT_SKILL);
-      this.executeSkill(nextCharacter, skill);
-    } else {
-      const skill = await this.selectEnemySkill(nextCharacter);
-      this.executeSkill(nextCharacter, skill);
-    }
-
-    delete this.charactersRemainToAct[nextCharacter.sid];
-  }
-
-  private async waitForAllCharactersToSkill() {
-    while (Object.keys(this.charactersRemainToAct).length > 0) {
-      await this.nextCharacterToAct();
-
-      const { isEnded } = await this.measureEnd();
-
-      if (isEnded) break;
-    }
   }
 
   private async startBattle() {
@@ -124,19 +189,34 @@ export class BattleSystem extends StreamBasedSystem {
         winner: this.battleEnd!.winner!.sid,
       },
     });
+
+    await this.once(BattleEvent.BATTLE_END_DESC_END);
   }
 
   public async run() {
     await this.startBattle();
 
     while (true) {
-      // 回合初始化逻辑
-      await this.onNewTurnStart();
+      await this.advanceTimeline();
 
-      // 每回合需要所有的角色都进行过出招判定
-      await this.waitForAllCharactersToSkill();
+      const readyCharacters = this.timelineCharacters.filter(
+        (tc) =>
+          tc.currentTime >= this.ACTION_THRESHOLD &&
+          !tc.isActing &&
+          !tc.selectedSkill
+      );
 
-      await this.onNewTurnEnd();
+      for (const tc of readyCharacters) {
+        await this.handleCharacterAction(tc);
+      }
+
+      const castingCompleteCharacters = this.timelineCharacters.filter(
+        (tc) => tc.selectedSkill && tc.castingTime! <= 0
+      );
+
+      for (const tc of castingCompleteCharacters) {
+        await this.handleSkillCasting(tc);
+      }
 
       if (this.measureEnd().isEnded) break;
     }
@@ -151,32 +231,26 @@ export class BattleSystem extends StreamBasedSystem {
   ): Promise<void> {
     const target = this.getRandomOpponent(character);
 
-    if (skill.cost > character.c_mp) {
-      this.$.publish({
-        type: BattleEvent.SKILL_USE,
-        payload: {
-          from: character.sid,
-          to: target.sid,
-          skill,
-          success: false,
-        },
-      });
-      return;
-    }
+    const success = !(skill.cost > character.c_mp);
 
-    character.c_mp -= skill.cost;
     this.$.publish({
       type: BattleEvent.SKILL_USE,
       payload: {
         from: character.sid,
         to: target.sid,
         skill,
-        success: true,
+        success,
       },
     });
 
+    await this.once(BattleEvent.SKILL_USE_DESC_END);
+
+    if (!success) return;
+
+    character.c_mp -= skill.cost;
+
     if (skill.damage) {
-      this.applyDamage(character, skill, target);
+      await this.applyDamage(character, skill, target);
     }
 
     if (skill.cooldown) {
@@ -184,19 +258,12 @@ export class BattleSystem extends StreamBasedSystem {
     }
   }
 
-  // 决定谁先出手
-  private determineInitiative() {
-    return this.characters
-      .filter(({ sid }) => this.charactersRemainToAct[sid])
-      .sort((a, b) => b.agility - a.agility);
-  }
-
   // 应用伤害
-  private applyDamage(
+  private async applyDamage(
     attacker: IBattleAbleCharacter,
     skill: ISkill,
     target: IBattleAbleCharacter = this.getRandomOpponent(attacker)
-  ): void {
+  ) {
     const damage = skill.damage || 0;
 
     // 计算防御减免
@@ -220,6 +287,8 @@ export class BattleSystem extends StreamBasedSystem {
         damage: finalDamage,
       },
     });
+
+    await this.once(BattleEvent.DAMAGE_DEALT_DESC_END);
   }
 
   // 获取随机对手
@@ -233,7 +302,6 @@ export class BattleSystem extends StreamBasedSystem {
     const context: IAIBattleContext = {
       self: character,
       opponent: this.getRandomOpponent(character),
-      currentTurn: this.currentTurn,
     };
 
     return BattleAI.selectBestSkill(context);

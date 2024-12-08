@@ -46,6 +46,22 @@ export interface IBattleAbleCharacter
   skills: ISkill[];
 }
 
+export interface ITimelineCharacter {
+  character: IBattleAbleCharacter;
+  currentTime: number;
+  isActing: boolean;
+  actionEndTime?: number;
+  normalizedAgility: number;
+  selectedSkill?: ISkill;
+  castingTime?: number;
+}
+
+export interface IBattleTimeControl {
+  isPaused: boolean;
+  pauseReason?: "selecting" | "casting" | "executing";
+  actingCharacter?: ITimelineCharacter;
+}
+
 export interface ISkill {
   id: SkillId;
   name: string;
