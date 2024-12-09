@@ -1,6 +1,8 @@
 import {
   BattleEvent,
+  EventStream,
   IAppendBattleLogEvent,
+  IEvent,
   LogType,
   NormalEvent,
 } from "../stream";
@@ -15,6 +17,7 @@ import { EnvironmentDescriptionGenerator } from "./environment";
 import { SkillDescriptionGenerator } from "./skill";
 import { DamageDescriptionGenerator } from "./damage";
 import { BattleDescriptionGenerator } from "./battle";
+import { sleep } from "@/utils/sleep";
 
 export class BattleDescriptionManager extends StreamBasedSystem {
   private generators: {
@@ -25,10 +28,10 @@ export class BattleDescriptionManager extends StreamBasedSystem {
   };
 
   private currentTypingTask: Promise<void> = Promise.resolve();
-  private typingSpeed: number = 20;
+  private typingSpeed: number = 40;
 
-  constructor() {
-    super();
+  constructor(eventStream: EventStream<IEvent>) {
+    super(eventStream);
     this.generators = {
       environment: new EnvironmentDescriptionGenerator(),
       skill: new SkillDescriptionGenerator(),
@@ -38,22 +41,24 @@ export class BattleDescriptionManager extends StreamBasedSystem {
   }
 
   public run() {
-    this.$.subscribe((event) => {
-      switch (event.type) {
-        case BattleEvent.BATTLE_START:
-          this.handleBattleStart(event.payload);
-          break;
-        case BattleEvent.SKILL_USE:
-          this.handleSkillUse(event.payload);
-          break;
-        case BattleEvent.DAMAGE_DEALT:
-          this.handleDamageDealt(event.payload);
-          break;
-        case BattleEvent.BATTLE_END:
-          this.handleBattleEnd(event.payload);
-          break;
-      }
-    });
+    this.addSubscription(
+      this.$.subscribe((event) => {
+        switch (event.type) {
+          case BattleEvent.BATTLE_START:
+            this.handleBattleStart(event.payload);
+            break;
+          case BattleEvent.SKILL_USE:
+            this.handleSkillUse(event.payload);
+            break;
+          case BattleEvent.DAMAGE_DEALT:
+            this.handleDamageDealt(event.payload);
+            break;
+          case BattleEvent.BATTLE_END:
+            this.handleBattleEnd(event.payload);
+            break;
+        }
+      })
+    );
   }
 
   private async typeText(
@@ -121,7 +126,7 @@ export class BattleDescriptionManager extends StreamBasedSystem {
       description,
       {},
       {
-        typeSpeed: context.skill.cost > 30 ? 40 : 20, // 强力技能打字更慢
+        typeSpeed: context.skill.cost > 30 ? 80 : 40, // 强力技能打字更慢
       }
     );
     await this.publishDescription("", {}, { joinOperator: "。" });
@@ -144,6 +149,8 @@ export class BattleDescriptionManager extends StreamBasedSystem {
   private async handleBattleEnd(context: IEndBattleContext) {
     const description = this.generators.battle.generate(context);
     await this.publishDescription(description);
+
+    await sleep(1000);
 
     this.$.publish({
       type: BattleEvent.BATTLE_END_DESC_END,

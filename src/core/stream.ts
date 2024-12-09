@@ -4,6 +4,9 @@ import {
   IBattleAbleCharacter,
   IBattleTimeControl,
   IEndBattleContext,
+  IScene,
+  ISceneAction,
+  ISceneState,
   ISkill,
   ISkillDamageBattleContext,
   ISkillUseBattleContext,
@@ -14,6 +17,12 @@ import { lazyGetInstanceSigleTon } from "@/utils/lazyGetInstanceSigleTon";
 export enum NormalEvent {
   USER_SELECT_SKILL = "USER_SELECT_SKILL",
   APPEND_BATTLE_LOG = "APPEND_BATTLE_LOG",
+
+  USER_SET_NAME = "USER_SET_NAME",
+}
+
+export enum StageEvent {
+  STAGE_SWITCH = "STAGE_SWITCH",
 }
 
 export enum BattleEvent {
@@ -23,17 +32,27 @@ export enum BattleEvent {
 
   DAMAGE_DEALT = "DAMAGE_DEALT",
   DAMAGE_DEALT_DESC_END = "DAMAGE_DEALT_DESC_END",
+
   BATTLE_END = "BATTLE_END",
   BATTLE_END_DESC_END = "BATTLE_END_DESC_END",
+  BATTLE_END_RESULT = "BATTLE_END_RESULT",
+
   NEXT_CHARACTER_TO_ACT = "NEXT_CHARACTER_TO_ACT",
 
   REQUEST_CHARACTER_STATE = "REQUEST_CHARACTER_STATE",
   RESPONSE_CHARACTER_STATE = "RESPONSE_CHARACTER_STATE",
 
   TIMELINE_UPDATE = "TIMELINE_UPDATE",
+
+  SCENE_UPDATE = "SCENE_UPDATE",
 }
 
-export type CoreEvent = NormalEvent | BattleEvent;
+export enum RequestEvent {
+  REQUEST_CURRENT_BATTLE = "REQUEST_CURRENT_BATTLE",
+  RESPONSE_CURRENT_BATTLE = "RESPONSE_CURRENT_BATTLE",
+}
+
+export type CoreEvent = NormalEvent | BattleEvent | StageEvent | RequestEvent;
 
 export interface IBaseEvent {
   type: CoreEvent;
@@ -58,14 +77,19 @@ export type EventPayloadMap = {
   [NormalEvent.USER_SELECT_SKILL]: ISkill;
   [NormalEvent.APPEND_BATTLE_LOG]: IAppendBattleLogEvent;
 
+  [NormalEvent.USER_SET_NAME]: string;
+
   [BattleEvent.BATTLE_START]: IStartBattleContext;
   [BattleEvent.SKILL_USE]: ISkillUseBattleContext;
   [BattleEvent.SKILL_USE_DESC_END]: never;
 
   [BattleEvent.DAMAGE_DEALT]: ISkillDamageBattleContext;
   [BattleEvent.DAMAGE_DEALT_DESC_END]: never;
+
   [BattleEvent.BATTLE_END]: IEndBattleContext;
   [BattleEvent.BATTLE_END_DESC_END]: never;
+  [BattleEvent.BATTLE_END_RESULT]: IEndBattleContext;
+
   [BattleEvent.NEXT_CHARACTER_TO_ACT]: IBattleAbleCharacter | null;
 
   [BattleEvent.REQUEST_CHARACTER_STATE]: CharacterSId;
@@ -79,6 +103,19 @@ export type EventPayloadMap = {
     }>;
     timeControl: IBattleTimeControl;
   };
+
+  [BattleEvent.SCENE_UPDATE]: {
+    scene: IScene;
+    state: ISceneState;
+  };
+
+  [StageEvent.STAGE_SWITCH]: {
+    path: string;
+    stateId: string;
+  };
+
+  [RequestEvent.REQUEST_CURRENT_BATTLE]: { stateId: string };
+  [RequestEvent.RESPONSE_CURRENT_BATTLE]: IStartBattleContext;
 };
 
 // 使用映射类型生成最终的IEvent类型
@@ -107,9 +144,8 @@ export class EventStream<T extends IEvent = IEvent> {
   /**
    * 订阅事件
    */
-  subscribe(observer: (value: T) => void): () => void {
-    const subscription = this.stream$.subscribe(observer);
-    return () => subscription.unsubscribe();
+  subscribe(observer: (value: T) => void) {
+    return this.stream$.subscribe(observer);
   }
 
   /**
@@ -131,17 +167,15 @@ export class StreamBasedSystem<T extends IEvent = IEvent> {
   private eventStream?: EventStream<T>;
   private subscriptions: Subscription[] = [];
 
-  public setEventStream(eventStream: EventStream<T>) {
+  constructor(eventStream: EventStream<T>) {
     this.eventStream = eventStream;
   }
 
-  protected addSubscription(subscription: Subscription) {
+  public addSubscription(subscription: Subscription) {
     this.subscriptions.push(subscription);
   }
 
-  protected once<K extends CoreEvent>(
-    type: K
-  ): Promise<Extract<T, { type: K }>> {
+  public once<K extends CoreEvent>(type: K): Promise<Extract<T, { type: K }>> {
     if (!this.eventStream)
       throw new Error("StreamBasedSystem Cannot run without a eventStream!!!");
 
@@ -155,7 +189,7 @@ export class StreamBasedSystem<T extends IEvent = IEvent> {
     });
   }
 
-  protected get $() {
+  public get $() {
     if (this.eventStream) return this.eventStream;
     if (!this.eventStream)
       throw new Error("StreamBasedSystem Cannot run without a eventStream!!!");
@@ -188,3 +222,35 @@ export const filterEvent = <T extends IEvent, K extends T["type"]>(type: K) => {
 };
 
 export const getCoreStream = lazyGetInstanceSigleTon(() => new EventStream());
+
+export const eventRequester = {
+  async getCurrentBattle(stateId: string) {
+    const temp = new StreamBasedSystem(getCoreStream());
+
+    temp.$.publish({
+      type: RequestEvent.REQUEST_CURRENT_BATTLE,
+      payload: { stateId },
+    });
+
+    const result = await temp.once(RequestEvent.RESPONSE_CURRENT_BATTLE);
+
+    temp.destroy();
+
+    return result.payload;
+  },
+};
+
+export const eventProvider = {
+  async provideCurrentBattle(stateId: string, payload: IStartBattleContext) {
+    const temp = new StreamBasedSystem(getCoreStream());
+
+    const event = await temp.once(RequestEvent.REQUEST_CURRENT_BATTLE);
+    if (event.payload.stateId === stateId) {
+      temp.$.publish({
+        type: RequestEvent.RESPONSE_CURRENT_BATTLE,
+        payload,
+      });
+      temp.destroy();
+    }
+  },
+};

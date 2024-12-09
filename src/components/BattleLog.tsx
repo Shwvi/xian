@@ -122,7 +122,7 @@ const RichRender = memo(
         <div
           className={cls(
             "px-3 rounded transition-all duration-500 text-gray-300",
-            isLast ? "opacity-100" : "opacity-0"
+            isLast ? "opacity-100" : "opacity-30"
           )}
         >
           <span className="px-1"></span>

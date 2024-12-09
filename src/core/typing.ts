@@ -14,6 +14,29 @@ export enum SkillId {
   DA_LI_JIN_GANG_ZHI,
 }
 
+export enum CultivationLevel {
+  // 凡人
+  ZERO,
+  // 炼气
+  ONE,
+  // 筑基
+  TWO,
+  // 金丹
+  THREE,
+  // 元婴
+  FOUR,
+  // 化神
+  FIVE,
+  // 炼虚
+  SIX,
+  // 合体
+  SEVEN,
+  // 大乘
+  EIGHT,
+  // 渡劫
+  NINE,
+}
+
 export type IBaseCharacter = {
   // 唯一标识
   sid: CharacterSId;
@@ -28,6 +51,8 @@ export type IBaseCharacter = {
   attack: number;
   defense: number;
   agility: number;
+
+  cultivation_level: CultivationLevel;
 
   skills: SkillId[];
 };
@@ -105,3 +130,39 @@ export type IBattleContext =
   | IStartBattleContext
   | ISkillUseBattleContext
   | ISkillDamageBattleContext;
+
+// 场景相关类型
+export interface ISceneAction {
+  type: "battle" | "move" | "talk";
+  description: string;
+  data: {
+    targetSceneId?: string;
+    enemyId?: CharacterSId;
+  };
+}
+
+export interface IScene {
+  id: string;
+  name: string;
+  description: string;
+  actions: ISceneAction[];
+}
+
+export interface ISceneState {
+  currentSceneId: string;
+  lastBattleResult?: {
+    won: boolean;
+    enemyId: CharacterSId;
+  };
+}
+
+export enum SceneId {
+  START = "start",
+  MAIN_HALL = "main_hall",
+  PRACTICE_GROUND = "practice_ground",
+  PILL_ROOM = "pill_room",
+  LIBRARY = "library",
+  FORBIDDEN_AREA = "forbidden_area",
+  ANCIENT_CAVE = "ancient_cave",
+  SECRET_CHAMBER = "secret_chamber",
+}

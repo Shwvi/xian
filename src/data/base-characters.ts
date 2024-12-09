@@ -1,4 +1,11 @@
-import { CharacterSId, IBaseCharacter, SkillId } from "@/core/typing";
+import {
+  CharacterSId,
+  CultivationLevel,
+  IBaseCharacter,
+  SkillId,
+} from "@/core/typing";
+import { getUserSystem } from "@/core/user";
+import { isUserSid } from "@/core/utils";
 import { lazyGetInstanceSigleTon } from "@/utils/lazyGetInstanceSigleTon";
 
 export class BaseCharactersCenter {
@@ -9,29 +16,17 @@ export class BaseCharactersCenter {
   }
 
   private initializeCharacters() {
-    this.charactersMap.set(CharacterSId.ME, {
-      sid: CharacterSId.ME,
-      name: "陈尘",
-      age: 20,
-      life_span: 100,
-      health_points: 100,
-      manna_points: 80,
-      attack: 15,
-      defense: 10,
-      agility: 12,
-      skills: [SkillId.QUAN, SkillId.YU_JIAN_SHU, SkillId.WU_LEI_ZHENG_FA],
-    });
-
     this.charactersMap.set(CharacterSId.TIE_QUAN, {
       sid: CharacterSId.TIE_QUAN,
       name: "铁山门弟子",
       age: 25,
       life_span: 90,
-      health_points: 30,
-      manna_points: 20,
+      health_points: 300,
+      manna_points: 200,
       attack: 10,
       defense: 5,
       agility: 5,
+      cultivation_level: CultivationLevel.ONE,
       skills: [
         SkillId.QUAN,
         SkillId.HUN_YUAN_TIE_QUAN,
@@ -42,7 +37,9 @@ export class BaseCharactersCenter {
   }
 
   public getCharacter(sid: CharacterSId): IBaseCharacter {
-    const character = this.charactersMap.get(sid);
+    const character = isUserSid(sid)
+      ? getUserSystem().getUser()
+      : this.charactersMap.get(sid);
     if (!character) {
       throw new Error(`Character ${sid} not found!`);
     }

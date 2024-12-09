@@ -2,6 +2,7 @@ import {
   BattleEvent,
   EventStream,
   filterEvent,
+  IEvent,
   NormalEvent,
   StreamBasedSystem,
 } from "./stream";
@@ -32,8 +33,11 @@ export class BattleSystem extends StreamBasedSystem {
     isPaused: false,
   };
 
-  constructor(characters: IBattleAbleCharacter[]) {
-    super();
+  constructor(
+    eventStream: EventStream<IEvent>,
+    characters: IBattleAbleCharacter[]
+  ) {
+    super(eventStream);
     this.characters = characters;
 
     // Calculate normalized agility values based on max agility
@@ -45,10 +49,6 @@ export class BattleSystem extends StreamBasedSystem {
       isActing: false,
       normalizedAgility: character.agility / maxAgility, // 保持正比关系的归一化
     }));
-  }
-
-  override setEventStream(eventStream: EventStream): void {
-    super.setEventStream(eventStream);
 
     const subscription = this.$.pipe(
       filterEvent(BattleEvent.REQUEST_CHARACTER_STATE)
@@ -191,6 +191,14 @@ export class BattleSystem extends StreamBasedSystem {
     });
 
     await this.once(BattleEvent.BATTLE_END_DESC_END);
+
+    this.$.publish({
+      type: BattleEvent.BATTLE_END_RESULT,
+      payload: {
+        enemies: enemies.map(({ sid }) => sid),
+        winner: this.battleEnd!.winner!.sid,
+      },
+    });
   }
 
   public async run() {
@@ -222,6 +230,8 @@ export class BattleSystem extends StreamBasedSystem {
     }
 
     await this.onBattleEnd();
+
+    return this.battleEnd;
   }
 
   // 执行选择的技能
