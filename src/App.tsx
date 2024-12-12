@@ -9,16 +9,21 @@ const Home = lazy(() => import("./pages/Home"));
 const Battle = lazy(() => import("./pages/battle"));
 const Scene = lazy(() => import("./pages/Scene"));
 const Start = lazy(() => import("./pages/Start"));
+const Death = lazy(() => import("./pages/Death"));
 
 function InnerApp() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   useEffect(() => {
     initializeNavigation(navigate);
-    sleep(3000).then(() => {
-      getXianCore().awesomeStart();
-      setIsLoading(false);
-    });
+  }, [navigate]);
+
+  useEffect(() => {
+    getXianCore()
+      .awesomeStart()
+      .then(() => {
+        setIsLoading(false);
+      });
   }, []);
 
   return (
@@ -29,6 +34,7 @@ function InnerApp() {
             <Route path="/battle" element={<Battle />} />
             <Route path="/scene" element={<Scene />} />
             <Route path="/start" element={<Start />} />
+            <Route path="/death" element={<Death />} />
           </>
         )}
         <Route path="*" element={<Home />} />

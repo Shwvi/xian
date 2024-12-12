@@ -141,19 +141,24 @@ export interface ISceneAction {
   };
 }
 
+export interface IScenePosition {
+  x: number;
+  y: number;
+}
+
 export interface IScene {
   id: string;
   name: string;
   description: string;
   actions: ISceneAction[];
+  position: IScenePosition;
+  neighbors: string[];
 }
 
 export interface ISceneState {
   currentSceneId: string;
-  lastBattleResult?: {
-    won: boolean;
-    enemyId: CharacterSId;
-  };
+  discoveredScenes: Set<string>;
+  lifeSpanUsed: number;
 }
 
 export enum SceneId {
@@ -165,4 +170,46 @@ export enum SceneId {
   FORBIDDEN_AREA = "forbidden_area",
   ANCIENT_CAVE = "ancient_cave",
   SECRET_CHAMBER = "secret_chamber",
+}
+
+export enum TerrainType {
+  PLAIN = "plain", // 平原
+  MOUNTAIN = "mountain", // 山脉
+  FOREST = "forest", // 森林
+  DESERT = "desert", // 沙漠
+  WATER = "water", // 水域
+  SACRED = "sacred", // 灵地
+  FORBIDDEN = "forbidden", // 禁地
+}
+
+export interface IMapRegion {
+  id: string;
+  name: string;
+  description: string;
+  terrain: TerrainType;
+  shape: {
+    type: "polygon" | "circle";
+    points:
+      | { x: number; y: number }[]
+      | { center: { x: number; y: number }; radius: number };
+  };
+  requiredLevel: CultivationLevel;
+  environmentEffects: {
+    type: string;
+    value: number;
+  }[];
+  dangerLevel: number;
+  resources: string[];
+  specialEvents?: string[];
+}
+
+export interface IWorldMap {
+  width: number;
+  height: number;
+  regions: IMapRegion[];
+  paths: {
+    start: string;
+    end: string;
+    type: "road" | "secret" | "dangerous";
+  }[];
 }

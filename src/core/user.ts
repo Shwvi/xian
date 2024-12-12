@@ -40,8 +40,8 @@ export class UserSystem extends StreamBasedSystem {
       age: 20,
       life_span: 100,
 
-      health_points: 200,
-      manna_points: 200,
+      health_points: 100,
+      manna_points: 60,
 
       attack: 15,
       defense: 10,

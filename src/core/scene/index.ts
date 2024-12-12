@@ -6,91 +6,160 @@ import {
   filterEvent,
   getCoreStream,
   IEvent,
+  NormalEvent,
   RequestEvent,
   StageEvent,
   StreamBasedSystem,
 } from "../stream";
-import { CharacterSId, IScene, ISceneState, SceneId } from "../typing";
+import {
+  CharacterSId,
+  IScene,
+  ISceneState,
+  SceneId,
+  IScenePosition,
+  IWorldMap,
+  IMapRegion,
+  TerrainType,
+} from "../typing";
 import { navigateTo } from "@/utils/navigation";
-import { generateUniqId } from "@/utils/uid";
 import { getScenesCenter } from "@/data/scenes";
+import { getUserSystem } from "@/core/user";
+import { mockWorldMap } from "@/data/worldMap";
+import { generateUniqId } from "@/utils/uid";
 
 export class SceneManager extends StreamBasedSystem {
-  private scenes: Map<string, IScene> = new Map();
-  private state: ISceneState = {
-    currentSceneId: SceneId.START,
-  };
-  private scenesCenter = getScenesCenter();
+  private worldMap!: IWorldMap;
+  public position$ = this.state$("position", { x: 0, y: 0 });
+  public isMoving$ = this.state$("isMoving", false);
 
   constructor(eventStream: EventStream<IEvent>) {
     super(eventStream);
   }
 
   public initialize() {
-    // 初始化所有场景
-    Object.values(SceneId).forEach((sceneId) => {
-      const scene = this.scenesCenter.getScene(sceneId);
-      this.scenes.set(sceneId, scene);
+    // Initialize all scenes
+    // 初始化世界地图
+    this.worldMap = mockWorldMap;
+
+    // 设置初始位置为铁剑山门
+    this.position$.next({
+      x: 0,
+      y: 0,
     });
 
     navigateTo("/scene");
   }
 
-  public getCurrentScene(): IScene {
-    const scene = this.scenes.get(this.state.currentSceneId);
-    if (!scene) throw new Error(`Scene ${this.state.currentSceneId} not found`);
-    return scene;
+  private calculateDistance(
+    pos1: IScenePosition,
+    pos2: IScenePosition
+  ): number {
+    const dx = pos1.x - pos2.x;
+    const dy = pos1.y - pos2.y;
+    return Math.sqrt(dx * dx + dy * dy);
   }
 
-  public async performAction(actionIndex: number) {
-    const currentScene = this.getCurrentScene();
-    const action = currentScene.actions[actionIndex];
+  private updatePlayerPosition(x: number, y: number) {
+    this.position$.next({ x, y });
+  }
 
-    if (!action) throw new Error("Invalid action index");
+  public async movePlayer(x: number, y: number) {
+    if (this.isMoving$.value) return;
 
-    switch (action.type) {
-      case "battle": {
-        const stateId = generateUniqId();
+    this.isMoving$.next(true);
+    try {
+      // 生成路途中的随机事件点
+      const distance = this.calculateDistance(this.position$.value, { x, y });
+      const eventCount = Math.floor(distance / 100); // 每100单位距离可能产生一个事件
 
-        this.$.publish({
-          type: StageEvent.STAGE_SWITCH,
-          payload: {
-            path: "/battle",
-            stateId,
+      const movementEvents = Array(eventCount)
+        .fill(null)
+        .map(() => ({
+          position: {
+            x:
+              this.position$.value.x +
+              Math.random() * (x - this.position$.value.x),
+            y:
+              this.position$.value.y +
+              Math.random() * (y - this.position$.value.y),
           },
-        });
+          event: "random_event",
+        }));
 
-        await eventProvider.provideCurrentBattle(stateId, {
-          enemies: [action.data.enemyId!],
-        });
+      // 检查路途中的事件
 
-        const battleEndResult = await this.once(BattleEvent.BATTLE_END_RESULT);
-
-        if (battleEndResult.payload.winner === CharacterSId.ME) {
-          //   this.state.currentSceneId = "main_hall";
-          //   this.publishSceneUpdate();
-        }
-
-        break;
-      }
-      case "move":
-        if (action.data.targetSceneId) {
-          this.moveSceneUpdate(action.data.targetSceneId);
-        }
-        break;
+      // 更新最终位置
+      this.updatePlayerPosition(x, y);
+    } finally {
+      this.isMoving$.next(false);
     }
   }
 
-  private moveSceneUpdate(sceneId: string) {
-    this.state.currentSceneId = sceneId;
+  private canEnterRegion(region: IMapRegion): boolean {
+    const user = getUserSystem().getUser();
+    return user.cultivation_level >= region.requiredLevel;
+  }
 
-    this.$.publish({
-      type: BattleEvent.SCENE_UPDATE,
-      payload: {
-        scene: this.getCurrentScene(),
-        state: this.state,
-      },
-    });
+  private calculateLifeCost(
+    distance: number,
+    fromRegion: IMapRegion | null,
+    toRegion: IMapRegion
+  ): number {
+    let baseCost = Math.ceil(distance / 100);
+
+    // 不同地形的消耗倍率
+    const terrainMultiplier = {
+      [TerrainType.PLAIN]: 1,
+      [TerrainType.MOUNTAIN]: 2,
+      [TerrainType.FOREST]: 1.5,
+      [TerrainType.DESERT]: 2.5,
+      [TerrainType.WATER]: 3,
+      [TerrainType.SACRED]: 1,
+      [TerrainType.FORBIDDEN]: 4,
+    };
+
+    // 考虑目标地形的消耗倍率
+    baseCost *= terrainMultiplier[toRegion.terrain];
+
+    // 考虑危险等级带来的额外消耗
+    baseCost *= 1 + toRegion.dangerLevel * 0.2;
+
+    return Math.ceil(baseCost);
+  }
+
+  private checkRandomEvents(region: IMapRegion) {
+    if (!region.specialEvents?.length) return;
+
+    // 根据地区危险等级调整事件触发概率
+    const eventChance = 0.1 + region.dangerLevel * 0.05;
+
+    if (Math.random() < eventChance) {
+      const event =
+        region.specialEvents[
+          Math.floor(Math.random() * region.specialEvents.length)
+        ];
+
+      // this.$.publish({
+      //   type: BattleEvent.SPECIAL_EVENT,
+      //   payload: {
+      //     eventId: event,
+      //     region: region.name,
+      //   },
+      // });
+    }
+  }
+
+  // 添加获取地图和玩家位置的方法
+  public getWorldMap(): IWorldMap {
+    return this.worldMap;
+  }
+
+  public getPlayerPosition(): { x: number; y: number } {
+    return { ...this.position$.value };
+  }
+
+  public getPlayerLevel(): number {
+    return getUserSystem().getUser().cultivation_level;
   }
 }
 

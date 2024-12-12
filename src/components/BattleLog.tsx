@@ -30,16 +30,9 @@ function parseContent(content: string): Token[] {
       }
 
       // 查找颜色标识，设置固定搜索范围
-      const searchLimit = Math.min(i + 20, content.length);
-      const colorEnd = content.indexOf(")", i);
-
-      // 如果在搜索范围内没找到结束括号，直接结束解析
-      if (colorEnd === -1 || colorEnd > searchLimit) {
-        break;
-      }
-
+      const searchLimit = Math.min(i + 10, content.length);
       const colorMatch = content
-        .slice(i + 1, colorEnd)
+        .slice(i + 1, searchLimit)
         .match(/^(red|green|blue|yellow|bisque)/);
 
       if (colorMatch) {
@@ -51,11 +44,11 @@ function parseContent(content: string): Token[] {
         stack.push(newToken);
         current = newToken.content as Token[];
         i += colorMatch[0].length;
+        continue;
       } else {
         // 如果没有匹配到颜色，直接结束解析
         break;
       }
-      continue;
     }
 
     if (char === ")" && stack.length > 0) {
@@ -121,11 +114,10 @@ const RichRender = memo(
       <div className="mt-4">
         <div
           className={cls(
-            "px-3 rounded transition-all duration-500 text-gray-300",
+            "rounded transition-all duration-500 text-gray-300",
             isLast ? "opacity-100" : "opacity-30"
           )}
         >
-          <span className="px-1"></span>
           {tokens.map((token, i) => (
             <TokenComponent key={i} token={token} />
           ))}

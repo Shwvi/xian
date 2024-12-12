@@ -12,6 +12,8 @@ export class ScenesCenter {
     this.scenesMap.set(SceneId.START, {
       id: SceneId.START,
       name: "山门前",
+      position: { x: 400, y: 300 },
+      neighbors: [SceneId.MAIN_HALL],
       description:
         "你站在铁山门前的青石板路上，周围古木参天，隐约可见远处的宫殿楼阁。",
       actions: [
@@ -35,6 +37,14 @@ export class ScenesCenter {
     this.scenesMap.set(SceneId.MAIN_HALL, {
       id: SceneId.MAIN_HALL,
       name: "大殿",
+      position: { x: 400, y: 200 },
+      neighbors: [
+        SceneId.PRACTICE_GROUND,
+        SceneId.PILL_ROOM,
+        SceneId.LIBRARY,
+        SceneId.FORBIDDEN_AREA,
+        SceneId.START,
+      ],
       description: "宏伟的大殿金碧辉煌，殿内香火缭绕，两侧站立着肃穆的弟子。",
       actions: [
         {
@@ -71,6 +81,8 @@ export class ScenesCenter {
     this.scenesMap.set(SceneId.PRACTICE_GROUND, {
       id: SceneId.PRACTICE_GROUND,
       name: "练武场",
+      position: { x: 250, y: 200 },
+      neighbors: [SceneId.MAIN_HALL],
       description:
         "宽阔的练武场上，不时传来打斗声和喝彩声，几名弟子正在切磋武艺。",
       actions: [
@@ -101,6 +113,8 @@ export class ScenesCenter {
     this.scenesMap.set(SceneId.PILL_ROOM, {
       id: SceneId.PILL_ROOM,
       name: "丹房",
+      position: { x: 550, y: 200 },
+      neighbors: [SceneId.MAIN_HALL],
       description:
         "丹房内弥漫着各种药材的清香，炉火正旺，丹师正在专心炼制丹药。",
       actions: [
@@ -122,6 +136,8 @@ export class ScenesCenter {
     this.scenesMap.set(SceneId.LIBRARY, {
       id: SceneId.LIBRARY,
       name: "藏经阁",
+      position: { x: 400, y: 100 },
+      neighbors: [SceneId.MAIN_HALL, SceneId.SECRET_CHAMBER],
       description:
         "古老的藏经阁内藏书万卷，空气中飘荡着淡淡的檀香，几位弟子正在静心研读典籍。",
       actions: [
@@ -145,6 +161,8 @@ export class ScenesCenter {
     this.scenesMap.set(SceneId.FORBIDDEN_AREA, {
       id: SceneId.FORBIDDEN_AREA,
       name: "后山禁地",
+      position: { x: 600, y: 100 },
+      neighbors: [SceneId.MAIN_HALL, SceneId.ANCIENT_CAVE],
       description:
         "这里是宗门禁地，瘴气弥漫，灵气紊乱。传言有上古大能在此悟道留下的机缘，也有凶险的妖兽出没。",
       actions: [
@@ -175,6 +193,8 @@ export class ScenesCenter {
     this.scenesMap.set(SceneId.ANCIENT_CAVE, {
       id: SceneId.ANCIENT_CAVE,
       name: "古洞",
+      position: { x: 700, y: 50 },
+      neighbors: [SceneId.FORBIDDEN_AREA],
       description:
         "幽深的山洞中刻满了古老的符文，空气中充满了浓郁的灵气，似乎蕴含着不为人知的秘密。",
       actions: [
@@ -198,6 +218,8 @@ export class ScenesCenter {
     this.scenesMap.set(SceneId.SECRET_CHAMBER, {
       id: SceneId.SECRET_CHAMBER,
       name: "密室",
+      position: { x: 300, y: 50 },
+      neighbors: [SceneId.LIBRARY],
       description:
         "这是藏经阁下的一间密室，四壁刻满了古老的功法口诀，空气中飘荡着淡淡的檀香。",
       actions: [

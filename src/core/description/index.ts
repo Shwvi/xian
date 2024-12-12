@@ -71,13 +71,37 @@ export class BattleDescriptionManager extends StreamBasedSystem {
   ): Promise<void> {
     const speed = controlOptions?.typeSpeed || this.typingSpeed;
 
-    // 逐字打印
-    for (let i = 0; i <= text.length; i++) {
+    let i = 0;
+    while (i < text.length) {
       await new Promise((resolve) => setTimeout(resolve, speed));
 
+      // If current char is English letter, collect consecutive letters
+      if (/[a-zA-Z]/.test(text[i])) {
+        let wordEnd = i;
+        while (wordEnd < text.length && /[a-zA-Z]/.test(text[wordEnd])) {
+          wordEnd++;
+        }
+        this.publishRawLog({
+          type: LogType.NORMAL,
+          content: text.slice(i, wordEnd),
+          ...options,
+        });
+        i = wordEnd;
+      } else {
+        // For non-English characters, publish one by one
+        this.publishRawLog({
+          type: LogType.NORMAL,
+          content: text.slice(i, i + 1),
+          ...options,
+        });
+        i++;
+      }
+    }
+
+    if (text.length === 0) {
       this.publishRawLog({
         type: LogType.NORMAL,
-        content: text.slice(i - 1, i),
+        content: "",
         ...options,
       });
     }

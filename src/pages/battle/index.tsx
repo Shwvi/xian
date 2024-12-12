@@ -168,8 +168,6 @@ export default function Battle() {
     );
   }
 
-  console.log("player", player);
-
   return (
     <div className={cls("flex flex-col h-full w-full")}>
       {/* 战斗记录 */}
@@ -183,7 +181,7 @@ export default function Battle() {
         isPaused={timeControl.isPaused}
       />
 
-      {/* <div className="flex items-center justify-center my-3">
+      <div className="flex items-center justify-center my-3">
         <hr className="flex-1 h-tiny bg-gray-300 my-2" />
         <img
           src="/weapon.png"
@@ -194,7 +192,7 @@ export default function Battle() {
           )}
         />
         <hr className="flex-1 h-tiny bg-gray-300 my-2" />
-      </div> */}
+      </div>
 
       {/* 菜单部分保持不变 */}
       <BattleMenu

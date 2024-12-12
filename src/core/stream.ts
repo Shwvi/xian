@@ -1,4 +1,11 @@
-import { Subject, Observable, OperatorFunction, Subscription } from "rxjs";
+/* eslint-disable react-hooks/rules-of-hooks */
+import {
+  Subject,
+  Observable,
+  OperatorFunction,
+  Subscription,
+  BehaviorSubject,
+} from "rxjs";
 import {
   CharacterSId,
   IBattleAbleCharacter,
@@ -13,6 +20,7 @@ import {
   IStartBattleContext,
 } from "./typing";
 import { lazyGetInstanceSigleTon } from "@/utils/lazyGetInstanceSigleTon";
+import { useState, useEffect } from "react";
 
 export enum NormalEvent {
   USER_SELECT_SKILL = "USER_SELECT_SKILL",
@@ -23,6 +31,7 @@ export enum NormalEvent {
 
 export enum StageEvent {
   STAGE_SWITCH = "STAGE_SWITCH",
+  PLAYER_DEATH = "PLAYER_DEATH",
 }
 
 export enum BattleEvent {
@@ -114,6 +123,8 @@ export type EventPayloadMap = {
     stateId: string;
   };
 
+  [StageEvent.PLAYER_DEATH]: IPlayerDeathPayload;
+
   [RequestEvent.REQUEST_CURRENT_BATTLE]: { stateId: string };
   [RequestEvent.RESPONSE_CURRENT_BATTLE]: IStartBattleContext;
 };
@@ -166,6 +177,7 @@ export class EventStream<T extends IEvent = IEvent> {
 export class StreamBasedSystem<T extends IEvent = IEvent> {
   private eventStream?: EventStream<T>;
   private subscriptions: Subscription[] = [];
+  private states = new Map<string, BehaviorSubject<any>>();
 
   constructor(eventStream: EventStream<T>) {
     this.eventStream = eventStream;
@@ -198,6 +210,24 @@ export class StreamBasedSystem<T extends IEvent = IEvent> {
 
   public destroy() {
     this.subscriptions.forEach((subscription) => subscription.unsubscribe());
+  }
+
+  protected state$<S>(key: string, initialValue: S) {
+    if (!this.states.has(key)) {
+      this.states.set(key, new BehaviorSubject(initialValue));
+    }
+    return this.states.get(key) as BehaviorSubject<S>;
+  }
+
+  public use<S>(stream$: BehaviorSubject<S>): S {
+    const [value, setValue] = useState(stream$.value);
+
+    useEffect(() => {
+      const sub = stream$.subscribe(setValue);
+      return () => sub.unsubscribe();
+    }, [stream$]);
+
+    return value;
   }
 }
 
@@ -254,3 +284,8 @@ export const eventProvider = {
     }
   },
 };
+
+export interface IPlayerDeathPayload {
+  cause: "lifespan_exhausted" | "battle_defeat";
+  age: number;
+}
