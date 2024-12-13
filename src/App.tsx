@@ -15,19 +15,20 @@ function InnerApp() {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(true);
   useEffect(() => {
-    initializeNavigation(navigate);
   }, [navigate]);
 
   useEffect(() => {
+    initializeNavigation(navigate);
+
     getXianCore()
-      .awesomeStart()
-      .then(() => {
-        setIsLoading(false);
-      });
+      .awesomeStart();
+    setIsLoading(false);
+
   }, []);
 
+
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={<div className="animate-spin"><img className="w-12 invert" src="/weapon.png" /></div>}>
       <Routes>
         {!isLoading && (
           <>

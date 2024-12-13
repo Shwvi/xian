@@ -218,17 +218,6 @@ export class StreamBasedSystem<T extends IEvent = IEvent> {
     }
     return this.states.get(key) as BehaviorSubject<S>;
   }
-
-  public use<S>(stream$: BehaviorSubject<S>): S {
-    const [value, setValue] = useState(stream$.value);
-
-    useEffect(() => {
-      const sub = stream$.subscribe(setValue);
-      return () => sub.unsubscribe();
-    }, [stream$]);
-
-    return value;
-  }
 }
 
 export const filterEvent = <T extends IEvent, K extends T["type"]>(type: K) => {
