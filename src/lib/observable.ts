@@ -1,41 +1,38 @@
 import { useState, useEffect } from "react";
+import { BehaviorSubject, Subject } from "rxjs";
 
-type Subscriber = () => void;
-
-// 创建一个包装器来处理所有值类型
+// 使用 BehaviorSubject 替代 ObservableWrapper
 class ObservableWrapper<T> {
-  private value: T;
-  private subscribers = new Set<Subscriber>();
+  private subject: BehaviorSubject<T>;
 
   constructor(initialValue: T) {
-    this.value = initialValue;
+    this.subject = new BehaviorSubject<T>(initialValue);
   }
 
   getValue(): T {
-    return this.value;
+    return this.subject.getValue();
   }
 
   setValue(newValue: T) {
-    this.value = newValue;
-    this.notify();
-  }
-
-  subscribe(subscriber: Subscriber) {
-    this.subscribers.add(subscriber);
-    return () => this.subscribers.delete(subscriber);
-  }
-
-  private notify() {
     if (batchingUpdates) {
-      this.subscribers.forEach((sub) => pendingNotifications.add(sub));
+      pendingNotifications.add(() => this.subject.next(newValue));
     } else {
-      this.subscribers.forEach((sub) => sub());
+      this.subject.next(newValue);
     }
+  }
+
+  subscribe(subscriber: (value: T) => void) {
+    const subscription = this.subject.subscribe(subscriber);
+    return () => subscription.unsubscribe();
+  }
+
+  getObservable() {
+    return this.subject;
   }
 }
 
 let batchingUpdates = false;
-const pendingNotifications = new Set<Subscriber>();
+const pendingNotifications = new Set<() => void>();
 
 export function batch(fn: () => void) {
   batchingUpdates = true;
@@ -64,7 +61,7 @@ function createDeepProxy<T extends object>(
 
     set(target: T, property: string | symbol, value: any) {
       const result = Reflect.set(target, property, value);
-      wrapper.setValue(wrapper.getValue()); // 触发更新
+      wrapper.setValue(wrapper.getValue());
       return result;
     },
   };

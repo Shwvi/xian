@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { sceneManager } from "@/core/scene/SceneManager";
-import { IRegion, ILandmark } from "@/core/typing";
-import { useObservable } from "@/lib/observable";
 import { MapManager } from "@/core/scene/MapManager";
+import { userSystem } from "@/core/user";
 
 export default function WorldMap() {
   const mapManager = useRef<MapManager | null>(null);
@@ -10,7 +9,11 @@ export default function WorldMap() {
 
   useEffect(() => {
     if (container.current) {
-      mapManager.current = new MapManager(container.current, sceneManager);
+      mapManager.current = new MapManager(
+        container.current,
+        sceneManager,
+        userSystem
+      );
 
       return () => {
         mapManager.current?.destroy();

@@ -1,5 +1,6 @@
 import Konva from "konva";
 import { SceneManager } from "./SceneManager";
+import { UserSystem } from "../user";
 
 export class MapManager {
   private stage: Konva.Stage;
@@ -16,14 +17,15 @@ export class MapManager {
 
   constructor(
     private container: HTMLDivElement,
-    private sceneManager: SceneManager
+    private sceneManager: SceneManager,
+    private userSystem: UserSystem
   ) {
     // 初始化舞台
     this.stage = new Konva.Stage({
       container: container,
       width: container.clientWidth,
       height: container.clientHeight,
-      draggable: true,
+      draggable: false,
     });
 
     // 創建主圖層（用於地標等）
@@ -109,7 +111,7 @@ export class MapManager {
         group.add(icon);
         group.add(text);
 
-        group.on("click", () => {
+        group.on("click touchstart", () => {
           this.movePlayerTo(landmark.position.x, landmark.position.y);
         });
 
@@ -125,17 +127,8 @@ export class MapManager {
       this.currentTween.destroy();
     }
 
-    // 如果正在进行动画，直接跳转到目标位置
-    if (this.isAnimating) {
-      this.playerGroup.position({ x, y });
-      this.centerMap();
-      return;
-    }
-
-    this.isAnimating = true;
-
     // 定义玩家移动速度 (像素/秒)
-    const PLAYER_SPEED = 200; // 可以根据需要调整这个值
+    const PLAYER_SPEED = 50; // 可以根据需要调整这个值
 
     // 计算距离
     const dx = x - this.playerGroup.x();
@@ -146,7 +139,8 @@ export class MapManager {
     const duration = distance / PLAYER_SPEED;
 
     try {
-      await this.smoothCenterMap(0.2);
+      if (!this.isAnimating) await this.smoothCenterMap(0.2);
+      this.isAnimating = true;
 
       await new Promise<void>((resolve) => {
         this.currentTween = new Konva.Tween({
@@ -160,10 +154,14 @@ export class MapManager {
           },
           onFinish: () => {
             this.currentTween = null;
+            this.sceneManager.isMoving.set(false);
             resolve();
           },
         }).play();
+        this.sceneManager.isMoving.set(true);
       });
+
+      this.sceneManager.updateNearLandmarks(this.getNearbyLandmarks());
     } finally {
       this.isAnimating = false;
     }
@@ -236,7 +234,7 @@ export class MapManager {
   }
 
   private initPlayerAnimation() {
-    const amplitude = 0.05;
+    const amplitude = 2;
     const period = 1200;
 
     this.animation = new Konva.Animation((frame) => {
@@ -244,10 +242,10 @@ export class MapManager {
 
       const sinValue = Math.sin((frame.time * 2 * Math.PI) / period);
 
-      // 更新整個組的Y位置
-      this.playerGroup.y(this.playerGroup.y() + amplitude * sinValue);
+      // 只改变 player 的相对位置
+      this.player.y(-amplitude * sinValue);
 
-      // 只更新陰影的縮放和透明度
+      // 更新陰影的縮放和透明度
       const shadowScale = 1 - Math.abs(sinValue) * 0.3;
       this.playerShadow.scaleX(shadowScale);
       this.playerShadow.scaleY(shadowScale);
@@ -259,55 +257,55 @@ export class MapManager {
 
   private bindEvents() {
     // 支持移動端縮放
-    let lastCenter: any = null;
-    let lastDist = 0;
+    // let lastCenter: any = null;
+    // let lastDist = 0;
 
-    this.stage.on("touchmove", (e) => {
-      e.evt.preventDefault();
-      const touch1 = e.evt.touches[0];
-      const touch2 = e.evt.touches[1];
+    // this.stage.on("touchmove", (e) => {
+    //   e.evt.preventDefault();
+    //   const touch1 = e.evt.touches[0];
+    //   const touch2 = e.evt.touches[1];
 
-      if (touch1 && touch2) {
-        if (this.isDragging) {
-          this.stage.draggable(false);
-          this.isDragging = false;
-        }
+    //   if (touch1 && touch2) {
+    //     if (this.isDragging) {
+    //       this.stage.draggable(false);
+    //       this.isDragging = false;
+    //     }
 
-        const center = {
-          x: (touch1.clientX + touch2.clientX) / 2,
-          y: (touch1.clientY + touch2.clientY) / 2,
-        };
+    //     const center = {
+    //       x: (touch1.clientX + touch2.clientX) / 2,
+    //       y: (touch1.clientY + touch2.clientY) / 2,
+    //     };
 
-        const dist = Math.sqrt(
-          Math.pow(touch2.clientX - touch1.clientX, 2) +
-            Math.pow(touch2.clientY - touch1.clientY, 2)
-        );
+    //     const dist = Math.sqrt(
+    //       Math.pow(touch2.clientX - touch1.clientX, 2) +
+    //         Math.pow(touch2.clientY - touch1.clientY, 2)
+    //     );
 
-        if (!lastCenter) {
-          lastCenter = center;
-          lastDist = dist;
-          return;
-        }
+    //     if (!lastCenter) {
+    //       lastCenter = center;
+    //       lastDist = dist;
+    //       return;
+    //     }
 
-        const scale = this.stage.scaleX() * (dist / lastDist);
+    //     const scale = this.stage.scaleX() * (dist / lastDist);
 
-        // 限制縮放範圍
-        const newScale = Math.max(0.5, Math.min(scale, 3));
+    //     // 限制縮放範圍
+    //     const newScale = Math.max(0.5, Math.min(scale, 3));
 
-        this.stage.scale({ x: newScale, y: newScale });
-        this.centerMap();
+    //     this.stage.scale({ x: newScale, y: newScale });
+    //     this.centerMap();
 
-        lastDist = dist;
-        lastCenter = center;
-      }
-    });
+    //     lastDist = dist;
+    //     lastCenter = center;
+    //   }
+    // });
 
-    this.stage.on("touchend", () => {
-      lastCenter = null;
-      lastDist = 0;
-      this.stage.draggable(true);
-      this.isDragging = true;
-    });
+    // this.stage.on("touchend", () => {
+    //   lastCenter = null;
+    //   lastDist = 0;
+    //   this.stage.draggable(true);
+    //   this.isDragging = true;
+    // });
 
     this.stage.on("click", (e) => {
       const pos = this.stage.getRelativePointerPosition();
@@ -327,5 +325,44 @@ export class MapManager {
   public destroy() {
     this.animation?.stop();
     this.stage.destroy();
+  }
+
+  /**
+   * 获取玩家附近的地标
+   * @param radius 搜索半径（像素单位）
+   * @returns 返回在指定半径内的地标数组
+   */
+  public getNearbyLandmarks(radius: number = 10) {
+    const playerPos = {
+      x: this.playerGroup.x(),
+      y: this.playerGroup.y(),
+    };
+
+    return this.landmarks
+      .filter((landmark) => {
+        const landmarkPos = {
+          x: landmark.x(),
+          y: landmark.y(),
+        };
+
+        // 计算地标与玩家之间的距离
+        const distance = Math.sqrt(
+          Math.pow(landmarkPos.x - playerPos.x, 2) +
+            Math.pow(landmarkPos.y - playerPos.y, 2)
+        );
+
+        return distance <= radius;
+      })
+      .map((landmark) => ({
+        id: landmark.id(),
+        position: {
+          x: landmark.x(),
+          y: landmark.y(),
+        },
+        distance: Math.sqrt(
+          Math.pow(landmark.x() - playerPos.x, 2) +
+            Math.pow(landmark.y() - playerPos.y, 2)
+        ),
+      }));
   }
 }

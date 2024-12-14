@@ -4,7 +4,7 @@ import {
   IBaseCharacter,
   SkillId,
 } from "@/core/typing";
-import { getUserSystem } from "@/core/user";
+import { userSystem } from "@/core/user";
 import { isUserSid } from "@/core/utils";
 import { lazyGetInstanceSigleTon } from "@/utils/lazyGetInstanceSigleTon";
 
@@ -38,7 +38,7 @@ export class BaseCharactersCenter {
 
   public getCharacter(sid: CharacterSId): IBaseCharacter {
     const character = isUserSid(sid)
-      ? getUserSystem().getUser()
+      ? userSystem().getUser()
       : this.charactersMap.get(sid);
     if (!character) {
       throw new Error(`Character ${sid} not found!`);

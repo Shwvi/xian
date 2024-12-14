@@ -14,9 +14,13 @@ import {
   IBaseCharacter,
   SkillId,
 } from "./typing";
-import { lazyGetInstanceSigleTon } from "@/utils/lazyGetInstanceSigleTon";
+import {
+  lazyGetInstance,
+  lazyGetInstanceSigleTon,
+} from "@/utils/lazyGetInstanceSigleTon";
 import { BehaviorSubject } from "rxjs/internal/BehaviorSubject";
 import { Point } from "./map-canvas";
+import { createObservable } from "@/lib/observable";
 
 export interface IUser extends IBaseCharacter {
   position: Point;
@@ -24,7 +28,7 @@ export interface IUser extends IBaseCharacter {
 
 export class UserSystem extends StreamBasedSystem {
   public initialized = false;
-  public user$?: BehaviorSubject<IUser>;
+  public user$ = createObservable<IUser | null>(null);
 
   constructor(eventStream: EventStream<IEvent>) {
     super(eventStream);
@@ -35,7 +39,7 @@ export class UserSystem extends StreamBasedSystem {
     if (!name) {
       navigateTo("/start");
       name = (await this.once(NormalEvent.USER_SET_NAME)).payload;
-      storage.set(StorageKey.user_position, name);
+      storage.set(StorageKey.user_name, name);
     }
     return name;
   }
@@ -43,7 +47,7 @@ export class UserSystem extends StreamBasedSystem {
   public async initialize() {
     const name = await this.getUserName();
 
-    this.user$ = this.state$<IUser>({
+    this.user$.set({
       sid: CharacterSId.ME,
       name,
 
@@ -68,6 +72,6 @@ export class UserSystem extends StreamBasedSystem {
   }
 }
 
-export const getUserSystem = lazyGetInstanceSigleTon(
+export const userSystem = lazyGetInstance(
   () => new UserSystem(getCoreStream())
 );
