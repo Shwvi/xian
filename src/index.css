@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --space: 1rem;
+  --bg: #09090b;
+  --fg: #e3e3e3;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+body {
+  display: grid;
+  color: var(--fg);
+  background: var(--bg);
+  padding: var(--space);
+  overscroll-behavior: none;
+}
+
+#root {
+  height: 100%;
+  width: 100%;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  overflow: hidden;
+}
+
+/* 隐藏全局滚动条 - Webkit 浏览器 (Chrome, Safari) */
+::-webkit-scrollbar {
+  display: none;
+}
+
+/* 隐藏全局滚动条 - Firefox */
+* {
+  scrollbar-width: none;
+}
