@@ -17,7 +17,7 @@ import cls from "classnames";
 import BattleTimeline from "@/components/BattleTimeline";
 import BattleMenu from "@/components/BattleMenu";
 import BattleCharacterStatus from "@/components/BattleCharacterStatus";
-import { getXianCore } from "@/core/core";
+import { xianCore } from "@/core/core";
 import { useParams, useSearchParams } from "react-router-dom";
 
 export default function Battle() {

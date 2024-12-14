@@ -6,6 +6,7 @@ import { userSystem } from "@/core/user";
 import { useObservable } from "@/lib/observable";
 import { cultivationLevelToText } from "@/utils/toText";
 import { useState } from "react";
+import SceneMap from "@/components/Scene/SceneMap";
 
 const Scene = () => {
   const currentLandmark = useObservable(sceneManager.currentLandmark);
@@ -13,11 +14,23 @@ const Scene = () => {
   const user = useObservable(userSystem.user$);
   return (
     <div className="h-full w-full flex flex-col gap-2">
-      {!currentLandmark && (
-        <div className="flex-1 w-full overflow-hidden rounded-md">
+      <div className="flex-1 w-full overflow-hidden rounded-md">
+        {currentLandmark && currentScene ? (
+          <div className="h-full bg-gray-800/60 rounded-lg">
+            <SceneMap
+              scenes={currentLandmark.scenes}
+              currentScene={currentScene}
+              onSceneClick={(clickedScene) => {
+                if (clickedScene.id !== currentScene?.id) {
+                  sceneManager.toScene(clickedScene.id);
+                }
+              }}
+            />
+          </div>
+        ) : (
           <WorldMap />
-        </div>
-      )}
+        )}
+      </div>
 
       <div className="flex-1 overflow-hidden flex flex-col bg-gray-900/50 backdrop-blur rounded-md">
         <div className="flex-1 overflow-y-auto p-4">
@@ -82,30 +95,30 @@ const RegionContent = () => {
 
       <div className="flex-1">
         {previewLandmark ? (
-          <div className="p-4 bg-gray-900 backdrop-blur rounded-md">
+          <div className="p-4 bg-gray-800/60 backdrop-blur rounded-md">
             <div className="flex items-center justify-between">
               <h3 className="font-medium text-gray-200">
                 {previewLandmark.name}
               </h3>
-
-              <button
-                onClick={() => setPreviewLandmark(null)}
-                className="py-1 text-sm text-gray-400 hover:text-gray-200"
-              >
-                返回
-              </button>
             </div>
 
             <div className="text-gray-300 text-sm text-justify">
               {previewLandmark.description}
             </div>
 
-            <div className="pt-2 bg-gradient-to-t from-gray-900">
+            <div className="pt-2 flex gap-2">
+              <button
+                onClick={() => setPreviewLandmark(null)}
+                className="w-full py-3 text-white rounded-lg font-medium"
+              >
+                离开
+              </button>
+
               <button
                 onClick={() => sceneManager.enterLandmark(previewLandmark.id)}
                 className="w-full py-3 text-white rounded-lg font-medium"
               >
-                进入{previewLandmark.name}
+                进入
               </button>
             </div>
           </div>
@@ -119,8 +132,7 @@ const RegionContent = () => {
               <button
                 key={landmark.id}
                 onClick={() => setPreviewLandmark(landmark)}
-                className="flex items-center p-4 bg-gray-800/60 hover:bg-gray-700/60 
-                           active:bg-gray-600/60 rounded-lg text-left transition-colors"
+                className="flex items-center p-4 bg-gray-800/60 rounded-lg text-left transition-colors"
               >
                 <div className="flex-1">
                   <div className="font-medium text-gray-200">
@@ -174,33 +186,42 @@ function SceneContent({
   onBack: () => void;
 }) {
   return (
-    <div>
-      <div className="flex items-center gap-4 mb-4">
-        <button onClick={onBack} className="text-gray-400 hover:text-gray-200">
-          ← 返回
-        </button>
-        <h2 className="text-2xl font-bold text-gray-200">
-          {scene?.name || landmark.name}
-        </h2>
-      </div>
-
-      <div className="text-gray-300 mb-6">
-        {scene?.description || landmark.description}
-      </div>
-
-      {scene && (
-        <div className="space-y-2">
-          {scene.actions.map((action, index) => (
-            <button
-              key={index}
-              className="block w-full text-left px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded"
-              onClick={() => sceneManager.handleAction(action)}
-            >
-              {action.description}
-            </button>
-          ))}
+    <div className="flex flex-col h-full">
+      <div className="flex-none">
+        <div className="flex items-center gap-4 mb-4">
+          <button
+            onClick={onBack}
+            className="text-gray-400 hover:text-gray-200"
+          >
+            ← 返回
+          </button>
+          <h2 className="text-2xl font-bold text-gray-200">
+            {scene?.name || landmark.name}
+          </h2>
         </div>
-      )}
+      </div>
+
+      <div className="flex-1 gap-4">
+        <div className="space-y-4">
+          <div className="text-gray-300">
+            {scene?.description || landmark.description}
+          </div>
+
+          {scene && (
+            <div className="space-y-2">
+              {scene.actions.map((action, index) => (
+                <button
+                  key={index}
+                  className="block w-full text-left px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded"
+                  onClick={() => sceneManager.handleAction(action)}
+                >
+                  {action.description}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

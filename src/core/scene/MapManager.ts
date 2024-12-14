@@ -36,10 +36,12 @@ export class MapManager {
     this.playerLayer = new Konva.Layer();
     this.stage.add(this.playerLayer);
 
+    const pos = this.getPlayerPosition();
+    const validPos = pos.x !== 0 && pos.y !== 0;
     // 創建玩家組
     this.playerGroup = new Konva.Group({
-      x: this.stage.width() / 2,
-      y: this.stage.height() / 2,
+      x: validPos ? pos.x : this.stage.width() / 2,
+      y: validPos ? pos.y : this.stage.height() / 2,
     });
 
     // 初始化玩家
@@ -79,6 +81,12 @@ export class MapManager {
 
     // 綁定事件
     this.bindEvents();
+
+    this.centerMap();
+  }
+
+  private getPlayerPosition() {
+    return this.userSystem.user$.get()!.position;
   }
 
   private createLandmarks() {
@@ -162,6 +170,10 @@ export class MapManager {
       });
 
       this.sceneManager.updateNearLandmarks(this.getNearbyLandmarks());
+      this.userSystem.updateUserPosition({
+        x: this.playerGroup.x(),
+        y: this.playerGroup.y(),
+      });
     } finally {
       this.isAnimating = false;
     }

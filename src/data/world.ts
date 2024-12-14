@@ -1,5 +1,5 @@
 import { TerrainType } from "@/core/map-canvas/chunk-manager/types";
-import { IWorldData } from "@/core/typing";
+import { CharacterSId, IWorldData } from "@/core/typing";
 export const worldData: IWorldData = {
   regions: [
     {
@@ -13,18 +13,28 @@ export const worldData: IWorldData = {
           id: "qingyun_sect",
           name: "青云宗",
           type: "sect",
-          description: "青云宗是东洲最强大的修仙门派之一。",
+          description:
+            "东洲最大的修仙门派之一，拥有深厚的修仙底蕴，门内主要修炼剑道，门主为剑仙，门内弟子皆为剑修，其中以天地一剑闻名天下",
           position: { x: 300, y: 150 },
           scenes: [
             {
               id: "main_hall",
               name: "大殿",
               description: "青云宗的主殿，金碧辉煌。",
+              position: { x: 10, y: 10 },
+              neighbors: ["alchemy_room", "library"],
               actions: [
                 {
                   type: "move",
                   description: "前往丹房",
                   data: { targetSceneId: "alchemy_room" },
+                },
+                {
+                  type: "battle",
+                  description: "与青云宗弟子切磋",
+                  data: {
+                    enemies: [CharacterSId.TIE_QUAN],
+                  },
                 },
                 {
                   type: "move",
@@ -37,6 +47,8 @@ export const worldData: IWorldData = {
               id: "alchemy_room",
               name: "丹房",
               description: "炼丹房内丹炉林立，药香四溢。",
+              position: { x: 100, y: 50 },
+              neighbors: ["main_hall"],
               actions: [
                 {
                   type: "craft",

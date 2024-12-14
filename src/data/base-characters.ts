@@ -38,7 +38,7 @@ export class BaseCharactersCenter {
 
   public getCharacter(sid: CharacterSId): IBaseCharacter {
     const character = isUserSid(sid)
-      ? userSystem().getUser()
+      ? userSystem.user$.get()
       : this.charactersMap.get(sid);
     if (!character) {
       throw new Error(`Character ${sid} not found!`);

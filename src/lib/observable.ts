@@ -72,7 +72,12 @@ function createDeepProxy<T extends object>(
 export function createObservable<T>(
   initialValue: T,
   options: { deep?: boolean } = {}
-): { get: () => T; set: (value: T) => void; wrapper: ObservableWrapper<T> } {
+): {
+  get: () => T;
+  set: (value: T) => void;
+  update: (updater: (currentValue: T) => T) => void;
+  wrapper: ObservableWrapper<T>;
+} {
   const wrapper = new ObservableWrapper<T>(initialValue);
 
   const get = () => {
@@ -87,7 +92,13 @@ export function createObservable<T>(
     wrapper.setValue(newValue);
   };
 
-  return { get, set, wrapper };
+  const update = (updater: (currentValue: T) => T) => {
+    const currentValue = get();
+    const newValue = updater(currentValue);
+    set(newValue);
+  };
+
+  return { get, set, update, wrapper };
 }
 
 export function useObservable<T>(

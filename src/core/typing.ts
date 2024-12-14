@@ -218,6 +218,11 @@ export interface IScene {
   id: string;
   name: string;
   description: string;
+  position: {
+    x: number;
+    y: number;
+  };
+  neighbors: string[]; // 相邻场景的 ID
   actions: ISceneAction[];
   requirements?: {
     level?: number;
@@ -229,6 +234,7 @@ export interface ISceneAction {
   type: "move" | "battle" | "talk" | "gather" | "craft" | string;
   description: string;
   data: {
+    enemies?: CharacterSId[];
     targetSceneId?: string;
     npcId?: string;
     itemId?: string;

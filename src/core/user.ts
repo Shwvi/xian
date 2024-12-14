@@ -21,6 +21,7 @@ import {
 import { BehaviorSubject } from "rxjs/internal/BehaviorSubject";
 import { Point } from "./map-canvas";
 import { createObservable } from "@/lib/observable";
+import _ from "lodash";
 
 export interface IUser extends IBaseCharacter {
   position: Point;
@@ -32,6 +33,8 @@ export class UserSystem extends StreamBasedSystem {
 
   constructor(eventStream: EventStream<IEvent>) {
     super(eventStream);
+
+    this.saveLocalPosition = _.debounce(this.saveLocalPosition.bind(this), 300);
   }
 
   private async getUserName() {
@@ -46,6 +49,8 @@ export class UserSystem extends StreamBasedSystem {
 
   public async initialize() {
     const name = await this.getUserName();
+
+    const localPosition = this.getLocalPosition();
 
     this.user$.set({
       sid: CharacterSId.ME,
@@ -65,10 +70,28 @@ export class UserSystem extends StreamBasedSystem {
 
       skills: [SkillId.WU_LEI_ZHENG_FA, SkillId.YU_JIAN_SHU, SkillId.QUAN],
 
-      position: { x: 0, y: 0 },
+      position: localPosition ?? { x: 0, y: 0 },
     });
 
     this.initialized = true;
+  }
+
+  private getLocalPosition() {
+    const position = storage.get<IUser["position"]>(StorageKey.user_position);
+    return position;
+  }
+
+  public updateUserPosition(pos: IUser["position"]) {
+    this.user$.update((user) => {
+      if (!user) return user;
+      user.position = pos;
+      return user;
+    });
+    this.saveLocalPosition();
+  }
+
+  private saveLocalPosition() {
+    storage.set(StorageKey.user_position, this.user$.get()!.position);
   }
 }
 

@@ -9,8 +9,17 @@ import { worldData } from "@/data/world";
 import { createObservable } from "@/lib/observable";
 import { lazyGetInstance } from "@/utils/lazyGetInstanceSigleTon";
 import { navigateTo } from "@/utils/navigation";
+import {
+  eventProvider,
+  EventStream,
+  getCoreStream,
+  IEvent,
+  StageEvent,
+  StreamBasedSystem,
+} from "../stream";
+import { generateUniqId } from "@/utils/uid";
 
-export class SceneManager {
+export class SceneManager extends StreamBasedSystem {
   public currentRegion = createObservable<IRegion | null>(null);
 
   public currentLandmark = createObservable<ILandmark | null>(null);
@@ -22,7 +31,9 @@ export class SceneManager {
   public data: IWorldData = worldData;
   public isMoving = createObservable<boolean>(false);
 
-  constructor() {}
+  constructor(eventStream: EventStream<IEvent>) {
+    super(eventStream);
+  }
 
   public initialize() {
     // 初始化为第一个区域
@@ -69,16 +80,32 @@ export class SceneManager {
     this.nearingLandmarks.set(landmarks.filter((l) => l !== undefined));
   }
 
-  public handleAction(action: ISceneAction) {
+  public async handleAction(action: ISceneAction) {
     switch (action.type) {
       case "move":
         if (action.data.targetSceneId) {
           sceneManager.toScene(action.data.targetSceneId);
         }
         break;
+      case "battle": {
+        const stateId = generateUniqId();
+        this.$.publish({
+          type: StageEvent.STAGE_SWITCH,
+          payload: {
+            stateId,
+            path: "/battle",
+          },
+        });
+        await eventProvider.provideCurrentBattle(stateId, {
+          enemies: action.data.enemies!,
+        });
+        break;
+      }
       // 处理其他类型的动作...
     }
   }
 }
 
-export const sceneManager = lazyGetInstance(() => new SceneManager());
+export const sceneManager = lazyGetInstance(
+  () => new SceneManager(getCoreStream())
+);
