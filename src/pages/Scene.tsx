@@ -33,7 +33,7 @@ const Scene = () => {
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col bg-gray-900/50 backdrop-blur rounded-md">
-        <div className="flex-1 overflow-y-auto p-4">
+        <div className="flex-1 overflow-y-hidden p-4">
           {currentLandmark && currentScene ? (
             <SceneContent
               landmark={currentLandmark}
@@ -93,7 +93,7 @@ const RegionContent = () => {
         <p className="text-sm text-gray-400 mt-1">{region?.description}</p>
       </div>
 
-      <div className="flex-1">
+      <div className="flex-1 overflow-auto">
         {previewLandmark ? (
           <div className="p-4 bg-gray-800/60 backdrop-blur rounded-md">
             <div className="flex items-center justify-between">
@@ -201,14 +201,14 @@ function SceneContent({
         </div>
       </div>
 
-      <div className="flex-1 gap-4">
-        <div className="space-y-4">
+      <div className="flex-1 gap-4 overflow-y-hidden">
+        <div className="h-full overflow-y-auto flex flex-col">
           <div className="text-gray-300">
             {scene?.description || landmark.description}
           </div>
 
           {scene && (
-            <div className="space-y-2">
+            <div className="py-2 flex-1 overflow-y-auto space-y-2">
               {scene.actions.map((action, index) => (
                 <button
                   key={index}
