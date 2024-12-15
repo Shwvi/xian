@@ -6,8 +6,10 @@ interface StorageInterface {
 }
 
 export enum StorageKey {
+  user_core = "user_core",
   user_name = "user_name",
   user_position = "user_position",
+  current_world = "current_world",
 }
 
 class Storage implements StorageInterface {

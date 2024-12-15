@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { BehaviorSubject, Subject } from "rxjs";
-
+import storage from "@/data/persist";
+import _ from "lodash";
 // 使用 BehaviorSubject 替代 ObservableWrapper
 class ObservableWrapper<T> {
   private subject: BehaviorSubject<T>;
@@ -42,37 +43,7 @@ export function batch(fn: () => void) {
   pendingNotifications.clear();
 }
 
-function createDeepProxy<T extends object>(
-  target: T,
-  wrapper: ObservableWrapper<any>
-): T {
-  if (!target || typeof target !== "object") {
-    return target;
-  }
-
-  const handler: ProxyHandler<T> = {
-    get(target: T, property: string | symbol) {
-      const value = Reflect.get(target, property);
-      if (value && typeof value === "object") {
-        return createDeepProxy(value, wrapper);
-      }
-      return value;
-    },
-
-    set(target: T, property: string | symbol, value: any) {
-      const result = Reflect.set(target, property, value);
-      wrapper.setValue(wrapper.getValue());
-      return result;
-    },
-  };
-
-  return new Proxy(target, handler);
-}
-
-export function createObservable<T>(
-  initialValue: T,
-  options: { deep?: boolean } = {}
-): {
+export function createObservable<T>(initialValue: T): {
   get: () => T;
   set: (value: T) => void;
   update: (updater: (currentValue: T) => T) => void;
@@ -81,11 +52,7 @@ export function createObservable<T>(
   const wrapper = new ObservableWrapper<T>(initialValue);
 
   const get = () => {
-    const value = wrapper.getValue();
-    if (options.deep && value && typeof value === "object") {
-      return createDeepProxy(value, wrapper);
-    }
-    return value;
+    return wrapper.getValue();
   };
 
   const set = (newValue: T) => {
@@ -99,6 +66,47 @@ export function createObservable<T>(
   };
 
   return { get, set, update, wrapper };
+}
+
+export function createPresistentObservable<T>(
+  initialValue: T,
+  options: {
+    key?: string; // 用于本地存储的键名
+    debounceTime?: number; // 防抖时间
+  } = {}
+): ReturnType<typeof createObservable<T>> {
+  // 如果没有提供 key，则无法持久化
+  if (!options.key) {
+    return createObservable(initialValue);
+  }
+
+  // 尝试从 localStorage 获取已保存的值
+  let savedValue: T;
+  try {
+    savedValue = storage.get(options.key) as T;
+  } catch (e) {
+    console.warn(`Failed to load persistent data for key ${options.key}:`, e);
+    savedValue = initialValue;
+  }
+
+  // 创建 observable
+  const observable = createObservable(savedValue);
+
+  // 添加持久化订阅
+  observable.wrapper.subscribe(
+    _.debounce((value) => {
+      try {
+        storage.set(options.key!, value);
+      } catch (e) {
+        console.warn(
+          `Failed to save persistent data for key ${options.key}:`,
+          e
+        );
+      }
+    }, options.debounceTime || 500)
+  );
+
+  return observable;
 }
 
 export function useObservable<T>(

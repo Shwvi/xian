@@ -8,12 +8,7 @@ export default function Loading({
   text?: string;
 }) {
   return (
-    <div
-      className={cls(
-        "flex flex-col items-center justify-center gap-2",
-        className
-      )}
-    >
+    <div className={cls("flex items-center justify-center gap-2", className)}>
       <img src="/weapon.png" className="w-8 h-8 invert animate-spin" />
       <div className="text-gray-300 text-xs opacity-50">
         {text || "加载中..."}

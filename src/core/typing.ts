@@ -196,26 +196,52 @@ export interface IScene {
 }
 
 export interface ISceneAction {
-  type: "move" | "battle" | "talk" | "gather" | "craft" | string;
+  type: "move" | "battle";
   description: string;
   data: {
     enemies?: CharacterSId[];
     targetSceneId?: string;
-    npcId?: string;
-    itemId?: string;
-    recipeId?: string;
-    [key: string]: any;
   };
 }
 
-export interface IWorldData {
-  regions: IRegion[];
+export interface IUserCheckCondition {
+  type: "level" | "items" | "quests" | "skills" | "conditions";
+  value: number | string | string[];
 }
 
-// 大区域类型
-export interface IRegion {
+export type ICheckCondition = IUserCheckCondition;
+
+export type IWorldAction =
+  | {
+      type: "move";
+      description: string;
+      target: IWorldData["id"];
+    }
+  | {
+      type: "character";
+      character: CharacterSId;
+    };
+
+export interface IWorldData {
+  width: number;
+  height: number;
+
   id: string;
   name: string;
   description: string;
-  landmarks: ILandmark[];
+
+  position: {
+    x: number;
+    y: number;
+  };
+
+  exit?: {
+    type: "return";
+    condition: ICheckCondition;
+  };
+
+  actions?: IWorldAction[];
+
+  children: IWorldData["id"][];
+  parent?: IWorldData["id"];
 }

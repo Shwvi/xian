@@ -20,7 +20,7 @@ import {
 } from "@/utils/lazyGetInstanceSigleTon";
 import { BehaviorSubject } from "rxjs/internal/BehaviorSubject";
 import { Point } from "./map-canvas";
-import { createObservable } from "@/lib/observable";
+import { createObservable, createPresistentObservable } from "@/lib/observable";
 import _ from "lodash";
 
 export interface IUser extends IBaseCharacter {
@@ -29,56 +29,42 @@ export interface IUser extends IBaseCharacter {
 
 export class UserSystem extends StreamBasedSystem {
   public initialized = false;
-  public user$ = createObservable<IUser | null>(null);
+  public user$ = createPresistentObservable<IUser | null>(null, {
+    key: StorageKey.user_core,
+  });
 
   constructor(eventStream: EventStream<IEvent>) {
     super(eventStream);
-
-    this.saveLocalPosition = _.debounce(this.saveLocalPosition.bind(this), 300);
-  }
-
-  private async getUserName() {
-    let name = storage.get<string>(StorageKey.user_name);
-    if (!name) {
-      navigateTo("/start");
-      name = (await this.once(NormalEvent.USER_SET_NAME)).payload;
-      storage.set(StorageKey.user_name, name);
-    }
-    return name;
   }
 
   public async initialize() {
-    const name = await this.getUserName();
+    if (!this.user$.get()) {
+      navigateTo("/start");
+      const name = (await this.once(NormalEvent.USER_SET_NAME)).payload;
 
-    const localPosition = this.getLocalPosition();
+      this.user$.set({
+        sid: CharacterSId.ME,
+        name,
 
-    this.user$.set({
-      sid: CharacterSId.ME,
-      name,
+        age: 20,
+        life_span: 100,
 
-      age: 20,
-      life_span: 100,
+        health_points: 100,
+        manna_points: 60,
 
-      health_points: 100,
-      manna_points: 60,
+        attack: 15,
+        defense: 10,
+        agility: 12,
 
-      attack: 15,
-      defense: 10,
-      agility: 12,
+        cultivation_level: CultivationLevel.ZERO,
 
-      cultivation_level: CultivationLevel.ZERO,
+        skills: [SkillId.WU_LEI_ZHENG_FA, SkillId.YU_JIAN_SHU, SkillId.QUAN],
 
-      skills: [SkillId.WU_LEI_ZHENG_FA, SkillId.YU_JIAN_SHU, SkillId.QUAN],
-
-      position: localPosition ?? { x: 0, y: 0 },
-    });
+        position: { x: 0, y: 0 },
+      });
+    }
 
     this.initialized = true;
-  }
-
-  private getLocalPosition() {
-    const position = storage.get<IUser["position"]>(StorageKey.user_position);
-    return position;
   }
 
   public updateUserPosition(pos: IUser["position"]) {
@@ -87,11 +73,6 @@ export class UserSystem extends StreamBasedSystem {
       user.position = pos;
       return user;
     });
-    this.saveLocalPosition();
-  }
-
-  private saveLocalPosition() {
-    storage.set(StorageKey.user_position, this.user$.get()!.position);
   }
 }
 
