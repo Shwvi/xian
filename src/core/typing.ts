@@ -133,28 +133,6 @@ export type IBattleContext =
   | ISkillUseBattleContext
   | ISkillDamageBattleContext;
 
-export interface IScenePosition {
-  x: number;
-  y: number;
-}
-
-export interface ISceneState {
-  currentSceneId: string;
-  discoveredScenes: Set<string>;
-  lifeSpanUsed: number;
-}
-
-export enum SceneId {
-  START = "start",
-  MAIN_HALL = "main_hall",
-  PRACTICE_GROUND = "practice_ground",
-  PILL_ROOM = "pill_room",
-  LIBRARY = "library",
-  FORBIDDEN_AREA = "forbidden_area",
-  ANCIENT_CAVE = "ancient_cave",
-  SECRET_CHAMBER = "secret_chamber",
-}
-
 export interface IMapRegion {
   id: string;
   name: string;
@@ -185,19 +163,6 @@ export interface IWorldMap {
     end: string;
     type: "road" | "secret" | "dangerous";
   }[];
-}
-
-// 大区域类型
-export interface IRegion {
-  id: string;
-  name: string;
-  description: string;
-  landmarks: ILandmark[];
-  terrain: TerrainType;
-  position: {
-    x: number;
-    y: number;
-  };
 }
 
 // 地标类型
@@ -245,4 +210,12 @@ export interface ISceneAction {
 
 export interface IWorldData {
   regions: IRegion[];
+}
+
+// 大区域类型
+export interface IRegion {
+  id: string;
+  name: string;
+  description: string;
+  landmarks: ILandmark[];
 }

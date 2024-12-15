@@ -11,10 +11,6 @@ import {
   IBattleAbleCharacter,
   IBattleTimeControl,
   IEndBattleContext,
-  IMapRegion,
-  IScene,
-  ISceneAction,
-  ISceneState,
   ISkill,
   ISkillDamageBattleContext,
   ISkillUseBattleContext,
@@ -53,8 +49,6 @@ export enum BattleEvent {
   RESPONSE_CHARACTER_STATE = "RESPONSE_CHARACTER_STATE",
 
   TIMELINE_UPDATE = "TIMELINE_UPDATE",
-
-  SCENE_UPDATE = "SCENE_UPDATE",
 }
 
 export enum RequestEvent {
@@ -112,11 +106,6 @@ export type EventPayloadMap = {
       castingTime?: number;
     }>;
     timeControl: IBattleTimeControl;
-  };
-
-  [BattleEvent.SCENE_UPDATE]: {
-    scene: IScene;
-    state: ISceneState;
   };
 
   [StageEvent.STAGE_SWITCH]: {
